@@ -1,5 +1,0 @@
-node_modules
-frontendnode_modules
-frontenddist
-.env
-.DS_Store
