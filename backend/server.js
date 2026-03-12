@@ -478,10 +478,10 @@ function startEnvironmentBroadcast(lat, lon) {
     doFetch(); // Fire immediately
     environmentBroadcastInterval = setInterval(doFetch, 5 * 60 * 1000); // Then every 5 min
 }
-app.get('*', (req, res) => {
+// To this (added a slash):
+app.get('/*', (req, res) => { 
     res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
-
 // Start the server using the PORT defined at the top
 app.listen(PORT, () => {
     console.log(`Vanguard API / SSE Tracker running on port ${PORT}`);
