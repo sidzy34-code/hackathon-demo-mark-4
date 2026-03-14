@@ -1,6 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+<<<<<<< HEAD
+=======
+const fs = require('fs');
+>>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
 
 const app = express();
 
@@ -44,6 +48,315 @@ function broadcastEvent(eventType, payload) {
 // In-memory store of recent alerts for correlation logic
 let recentAlerts = [];
 
+<<<<<<< HEAD
+=======
+// Simple disk-backed store for fauna catalog and camera spottings
+const DATA_DIR = path.join(__dirname, 'data');
+const FAUNA_FILE = path.join(DATA_DIR, 'fauna.json');
+const SPOTTINGS_FILE = path.join(DATA_DIR, 'spottings.json');
+
+function ensureDataDir() {
+    if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+}
+
+function readJsonSafe(filePath, fallback) {
+    try {
+        if (!fs.existsSync(filePath)) return fallback;
+        const raw = fs.readFileSync(filePath, 'utf8');
+        return raw ? JSON.parse(raw) : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function writeJsonSafe(filePath, value) {
+    ensureDataDir();
+    fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf8');
+}
+
+// Seed fauna catalog with rough, publicly available estimates (approximate, for demo only)
+function seedFaunaIfEmpty() {
+    const existing = readJsonSafe(FAUNA_FILE, null);
+    if (existing) return existing;
+    const seeded = {
+        nagarhole: [
+            {
+                id: 'ngh-tiger',
+                parkId: 'nagarhole',
+                commonName: 'Bengal Tiger',
+                scientificName: 'Panthera tigris tigris',
+                estimatedCount: 150,
+                status: 'EN',
+                notes: 'High-density tiger landscape; estimate aggregated from recent Karnataka tiger census reports.'
+            },
+            {
+                id: 'ngh-elephant',
+                parkId: 'nagarhole',
+                commonName: 'Asian Elephant',
+                scientificName: 'Elephas maximus indicus',
+                estimatedCount: 800,
+                status: 'EN',
+                notes: 'Part of the larger Nilgiri elephant landscape; rough pooled estimate.'
+            },
+            {
+                id: 'ngh-leopard',
+                parkId: 'nagarhole',
+                commonName: 'Indian Leopard',
+                scientificName: 'Panthera pardus fusca',
+                estimatedCount: 120,
+                status: 'VU',
+                notes: 'Leopard density inferred from camera trap studies overlapping tiger grids.'
+            }
+        ],
+        corbett: [
+            {
+                id: 'cor-tiger',
+                parkId: 'corbett',
+                commonName: 'Bengal Tiger',
+                scientificName: 'Panthera tigris tigris',
+                estimatedCount: 250,
+                status: 'EN',
+                notes: 'Corbett landscape holds one of India’s highest tiger populations; figure is rounded for demo.'
+            },
+            {
+                id: 'cor-elephant',
+                parkId: 'corbett',
+                commonName: 'Asian Elephant',
+                scientificName: 'Elephas maximus indicus',
+                estimatedCount: 1000,
+                status: 'EN',
+                notes: 'Trans-Himalayan elephant population estimate pooled across Corbett–Rajaji corridor.'
+            },
+            {
+                id: 'cor-gharial',
+                parkId: 'corbett',
+                commonName: 'Gharial',
+                scientificName: 'Gavialis gangeticus',
+                estimatedCount: 40,
+                status: 'CR',
+                notes: 'Critically endangered riverine crocodilian; small, reintroduced population.'
+            }
+        ],
+        kaziranga: [
+            {
+                id: 'kaz-rhino',
+                parkId: 'kaziranga',
+                commonName: 'Indian One-horned Rhinoceros',
+                scientificName: 'Rhinoceros unicornis',
+                estimatedCount: 2600,
+                status: 'VU',
+                notes: 'Approximate based on 2018 census (~2,613 individuals).'
+            },
+            {
+                id: 'kaz-elephant',
+                parkId: 'kaziranga',
+                commonName: 'Asian Elephant',
+                scientificName: 'Elephas maximus indicus',
+                estimatedCount: 1200,
+                status: 'EN',
+                notes: 'Large breeding population across Kaziranga–Karbi Anglong complex.'
+            },
+            {
+                id: 'kaz-tiger',
+                parkId: 'kaziranga',
+                commonName: 'Bengal Tiger',
+                scientificName: 'Panthera tigris tigris',
+                estimatedCount: 120,
+                status: 'EN',
+                notes: 'High tiger density; rounded composite estimate for the demo.'
+            }
+        ],
+        sundarbans: [
+            {
+                id: 'sun-tiger',
+                parkId: 'sundarbans',
+                commonName: 'Sundarbans Bengal Tiger',
+                scientificName: 'Panthera tigris tigris',
+                estimatedCount: 100,
+                status: 'EN',
+                notes: 'Mangrove-adapted tiger population across Indian Sundarbans; rounded for demo.'
+            },
+            {
+                id: 'sun-dolphin',
+                parkId: 'sundarbans',
+                commonName: 'Irrawaddy Dolphin',
+                scientificName: 'Orcaella brevirostris',
+                estimatedCount: 80,
+                status: 'EN',
+                notes: 'Estimates vary widely; small estuarine population used for indicative purposes.'
+            },
+            {
+                id: 'sun-crocodile',
+                parkId: 'sundarbans',
+                commonName: 'Estuarine Crocodile',
+                scientificName: 'Crocodylus porosus',
+                estimatedCount: 250,
+                status: 'LC',
+                notes: 'Large apex reptile; number is coarse-grained, for visualization only.'
+            }
+        ],
+        'maasai-mara': [
+            {
+                id: 'mara-lion',
+                parkId: 'maasai-mara',
+                commonName: 'African Lion',
+                scientificName: 'Panthera leo melanochaita',
+                estimatedCount: 850,
+                status: 'VU',
+                notes: 'Covers the broader Mara–Serengeti system; Mara-only number would be lower.'
+            },
+            {
+                id: 'mara-elephant',
+                parkId: 'maasai-mara',
+                commonName: 'African Savanna Elephant',
+                scientificName: 'Loxodonta africana',
+                estimatedCount: 2500,
+                status: 'EN',
+                notes: 'Mobile cross-border population between Kenya and Tanzania.'
+            },
+            {
+                id: 'mara-rhino',
+                parkId: 'maasai-mara',
+                commonName: 'Black Rhinoceros',
+                scientificName: 'Diceros bicornis michaeli',
+                estimatedCount: 40,
+                status: 'CR',
+                notes: 'Small remnant population under intense protection.'
+            }
+        ],
+        kruger: [
+            {
+                id: 'kru-elephant',
+                parkId: 'kruger',
+                commonName: 'African Savanna Elephant',
+                scientificName: 'Loxodonta africana',
+                estimatedCount: 19500,
+                status: 'EN',
+                notes: 'Rounded from SANParks reports (~19–20k individuals).'
+            },
+            {
+                id: 'kru-white-rhino',
+                parkId: 'kruger',
+                commonName: 'Southern White Rhinoceros',
+                scientificName: 'Ceratotherium simum simum',
+                estimatedCount: 2500,
+                status: 'NT',
+                notes: 'Numbers have declined sharply; value given is illustrative.'
+            },
+            {
+                id: 'kru-wild-dog',
+                parkId: 'kruger',
+                commonName: 'African Wild Dog',
+                scientificName: 'Lycaon pictus',
+                estimatedCount: 150,
+                status: 'EN',
+                notes: 'Highly mobile packs; small meta-population within Greater Kruger.'
+            }
+        ]
+    };
+    writeJsonSafe(FAUNA_FILE, seeded);
+    return seeded;
+}
+
+function seedSpottingsIfEmpty() {
+    const existing = readJsonSafe(SPOTTINGS_FILE, null);
+    if (existing) return existing;
+    const now = new Date();
+    const iso = (offsetMinutes) => new Date(now.getTime() - offsetMinutes * 60000).toISOString();
+    const seeded = {
+        nagarhole: [
+            {
+                id: 'ngh-spot-1',
+                parkId: 'nagarhole',
+                speciesCommonName: 'Asian Elephant',
+                scientificName: 'Elephas maximus indicus',
+                zone: 'Z2',
+                timestamp: iso(35),
+                imageUrl: 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?q=80&w=800&auto=format&fit=crop',
+                visionMode: 'DAY'
+            },
+            {
+                id: 'ngh-spot-2',
+                parkId: 'nagarhole',
+                speciesCommonName: 'Bengal Tiger',
+                scientificName: 'Panthera tigris tigris',
+                zone: 'Z4',
+                timestamp: iso(120),
+                imageUrl: 'https://images.unsplash.com/photo-1510936111840-65e151ad71bb?q=80&w=800&auto=format&fit=crop',
+                visionMode: 'NIGHT'
+            }
+        ],
+        corbett: [
+            {
+                id: 'cor-spot-1',
+                parkId: 'corbett',
+                speciesCommonName: 'Bengal Tiger',
+                scientificName: 'Panthera tigris tigris',
+                zone: 'Z3',
+                timestamp: iso(90),
+                imageUrl: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?q=80&w=800&auto=format&fit=crop',
+                visionMode: 'NIGHT'
+            }
+        ],
+        kaziranga: [
+            {
+                id: 'kaz-spot-1',
+                parkId: 'kaziranga',
+                speciesCommonName: 'Indian One-horned Rhinoceros',
+                scientificName: 'Rhinoceros unicornis',
+                zone: 'Z1',
+                timestamp: iso(45),
+                imageUrl: 'https://images.unsplash.com/photo-1524135329990-07660cd5bf10?q=80&w=800&auto=format&fit=crop',
+                visionMode: 'DAY'
+            }
+        ],
+        sundarbans: [
+            {
+                id: 'sun-spot-1',
+                parkId: 'sundarbans',
+                speciesCommonName: 'Sundarbans Bengal Tiger',
+                scientificName: 'Panthera tigris tigris',
+                zone: 'Z5',
+                timestamp: iso(15),
+                imageUrl: 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?q=80&w=800&auto=format&fit=crop',
+                visionMode: 'NIGHT'
+            }
+        ],
+        'maasai-mara': [
+            {
+                id: 'mara-spot-1',
+                parkId: 'maasai-mara',
+                speciesCommonName: 'African Lion',
+                scientificName: 'Panthera leo melanochaita',
+                zone: 'Z6',
+                timestamp: iso(60),
+                imageUrl: 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?q=80&w=800&auto=format&fit=crop',
+                visionMode: 'DAY'
+            }
+        ],
+        kruger: [
+            {
+                id: 'kru-spot-1',
+                parkId: 'kruger',
+                speciesCommonName: 'African Wild Dog',
+                scientificName: 'Lycaon pictus',
+                zone: 'Z7',
+                timestamp: iso(25),
+                imageUrl: 'https://images.unsplash.com/photo-1601758493928-1993e6ec87cd?q=80&w=800&auto=format&fit=crop',
+                visionMode: 'DAY'
+            }
+        ]
+    };
+    writeJsonSafe(SPOTTINGS_FILE, seeded);
+    return seeded;
+}
+
+let faunaStore = seedFaunaIfEmpty();
+let spottingsStore = seedSpottingsIfEmpty();
+
+>>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
 // ==========================================
 // 3. VANGUARD CORRELATION ENGINE (VCE)
 // ==========================================
@@ -150,7 +463,84 @@ app.post('/api/webhooks/clear', (req, res) => {
 });
 
 // ==========================================
+<<<<<<< HEAD
 // 5. AI CLASSIFICATION (CLARIFAI INTEGRATION)
+=======
+// 5. FAUNA CATALOG & 24H SPOTTINGS (PERSISTENT)
+// ==========================================
+
+app.get('/api/fauna/:parkId', (req, res) => {
+    const { parkId } = req.params;
+    faunaStore = readJsonSafe(FAUNA_FILE, faunaStore || {});
+    const list = faunaStore[parkId] || [];
+    res.json(list);
+});
+
+app.post('/api/fauna/:parkId', (req, res) => {
+    const { parkId } = req.params;
+    const { commonName, scientificName, estimatedCount, status, notes } = req.body || {};
+    faunaStore = readJsonSafe(FAUNA_FILE, faunaStore || {});
+    const entry = {
+        id: `${parkId}-${Date.now()}`,
+        parkId,
+        commonName,
+        scientificName,
+        estimatedCount: Number(estimatedCount) || 0,
+        status: status || '',
+        notes: notes || ''
+    };
+    faunaStore[parkId] = [...(faunaStore[parkId] || []), entry];
+    writeJsonSafe(FAUNA_FILE, faunaStore);
+    res.status(201).json(entry);
+});
+
+app.put('/api/fauna/:parkId/:id', (req, res) => {
+    const { parkId, id } = req.params;
+    const { commonName, scientificName, estimatedCount, status, notes } = req.body || {};
+    faunaStore = readJsonSafe(FAUNA_FILE, faunaStore || {});
+    const list = faunaStore[parkId] || [];
+    const idx = list.findIndex(e => e.id === id);
+    if (idx === -1) {
+        return res.status(404).json({ error: 'Not found' });
+    }
+    const updated = {
+        ...list[idx],
+        commonName: commonName ?? list[idx].commonName,
+        scientificName: scientificName ?? list[idx].scientificName,
+        estimatedCount: estimatedCount != null ? Number(estimatedCount) || 0 : list[idx].estimatedCount,
+        status: status ?? list[idx].status,
+        notes: notes ?? list[idx].notes
+    };
+    list[idx] = updated;
+    faunaStore[parkId] = list;
+    writeJsonSafe(FAUNA_FILE, faunaStore);
+    res.json(updated);
+});
+
+app.delete('/api/fauna/:parkId/:id', (req, res) => {
+    const { parkId, id } = req.params;
+    faunaStore = readJsonSafe(FAUNA_FILE, faunaStore || {});
+    const list = faunaStore[parkId] || [];
+    const next = list.filter(e => e.id !== id);
+    faunaStore[parkId] = next;
+    writeJsonSafe(FAUNA_FILE, faunaStore);
+    res.json({ success: true });
+});
+
+app.get('/api/spottings/:parkId', (req, res) => {
+    const { parkId } = req.params;
+    spottingsStore = readJsonSafe(SPOTTINGS_FILE, spottingsStore || {});
+    const list = (spottingsStore[parkId] || []).filter(s => {
+        const ts = new Date(s.timestamp).getTime();
+        const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+        return ts >= cutoff;
+    });
+    res.json(list);
+});
+
+// ==========================================
+// 6. AI CLASSIFICATION (CLARIFAI INTEGRATION)
+>>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
 // ==========================================
 
 app.post('/api/analyze/vision', async (req, res) => {
@@ -217,7 +607,11 @@ app.post('/api/analyze/vision', async (req, res) => {
 });
 
 // ==========================================
+<<<<<<< HEAD
 // 6. EXTERNAL ENVIRONMENTAL INTEGRATIONS (NASA/GBIF)
+=======
+// 7. EXTERNAL ENVIRONMENTAL INTEGRATIONS (NASA/GBIF)
+>>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
 // ==========================================
 
 function getLunarIllumination(lon = 0) {
@@ -302,7 +696,11 @@ app.get('/api/gbif/:lat/:lon', async (req, res) => {
 });
 
 // ==========================================
+<<<<<<< HEAD
 // 7. CRITICAL HOUSING & ROUTING LOGIC (DO NOT MODIFY)
+=======
+// 8. CRITICAL HOUSING & ROUTING LOGIC (DO NOT MODIFY)
+>>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
 // ==========================================
 
 // SPA Fallback: Must be below all API routes

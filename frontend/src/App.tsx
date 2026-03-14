@@ -7,6 +7,10 @@ import ZoneStatus from './components/ZoneStatus';
 import QuickStats from './components/QuickStats';
 import EnvironmentPanel from './components/EnvironmentPanel';
 import LandingPage from './LandingPage';
+<<<<<<< HEAD
+=======
+import SpeciesIntelPage from './SpeciesIntelPage';
+>>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
 import CameraFeedsModal from './components/CameraFeedsModal';
 import CommunityReportModal from './components/CommunityReportModal';
 import RemoteController from './RemoteController';
@@ -25,6 +29,10 @@ const DashboardView = () => {
                 onBack={() => navigate('/')} 
                 parkId={id} 
                 onCameraFeeds={() => setCameraFeedsOpen(true)} 
+<<<<<<< HEAD
+=======
+                onSpeciesIntel={() => navigate(`/park/${id}/species`)}
+>>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
             />
 
             {/* Main Content Area */}
@@ -89,6 +97,10 @@ function App() {
             <Routes>
                 <Route path="/" element={<LandingWrapper />} />
                 <Route path="/park/:id" element={<DashboardView />} />
+<<<<<<< HEAD
+=======
+                <Route path="/park/:id/species" element={<SpeciesIntelPage />} />
+>>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
                 <Route path="/remote" element={<RemoteController />} />
             </Routes>
         </BrowserRouter>
