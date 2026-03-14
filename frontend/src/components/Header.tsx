@@ -6,16 +6,11 @@ interface HeaderProps {
     onBack?: () => void;
     parkId?: string | null;
     onCameraFeeds?: () => void;
-<<<<<<< HEAD
-}
-
-const Header: React.FC<HeaderProps> = ({ onBack, parkId, onCameraFeeds }) => {
-=======
     onSpeciesIntel?: () => void;
+    onSoundAnalysis?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onBack, parkId, onCameraFeeds, onSpeciesIntel }) => {
->>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
+const Header: React.FC<HeaderProps> = ({ onBack, parkId, onCameraFeeds, onSpeciesIntel, onSoundAnalysis }) => {
     const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
@@ -53,12 +48,13 @@ const Header: React.FC<HeaderProps> = ({ onBack, parkId, onCameraFeeds, onSpecie
 
             {/* Right: Controls & Clock */}
             <div className="flex items-center gap-4">
-                <button onClick={onCameraFeeds} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-vanguard-panel border border-vanguard-border rounded hover:bg-gray-800 transition-colors">
+                <button
+                    onClick={onCameraFeeds}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-vanguard-panel border border-vanguard-border rounded hover:bg-gray-800 transition-colors"
+                >
                     <Fingerprint className="w-4 h-4 text-vanguard-species" />
                     CAMERA FEEDS
                 </button>
-<<<<<<< HEAD
-=======
                 <button
                     onClick={onSpeciesIntel}
                     className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-vanguard-panel border border-vanguard-border rounded hover:bg-gray-800 transition-colors"
@@ -66,8 +62,10 @@ const Header: React.FC<HeaderProps> = ({ onBack, parkId, onCameraFeeds, onSpecie
                     <span className="w-2 h-2 rounded-full bg-vanguard-species animate-pulse" />
                     SPECIES ID
                 </button>
->>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
-                <button className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-vanguard-panel border border-vanguard-border rounded hover:bg-gray-800 transition-colors">
+                <button
+                    onClick={onSoundAnalysis}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-vanguard-panel border border-vanguard-border rounded hover:bg-gray-800 transition-colors"
+                >
                     <Activity className="w-4 h-4 text-vanguard-community" />
                     SOUND ANALYSIS
                 </button>

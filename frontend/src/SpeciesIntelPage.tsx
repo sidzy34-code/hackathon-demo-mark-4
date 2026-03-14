@@ -42,6 +42,8 @@ const SpeciesIntelPage: React.FC = () => {
 
     const [fauna, setFauna] = useState<FaunaEntry[]>([]);
     const [spottings, setSpottings] = useState<Spotting[]>([]);
+    const [faunaFilter, setFaunaFilter] = useState('');
+    const [spottingsFilter, setSpottingsFilter] = useState('');
     const [loadingFauna, setLoadingFauna] = useState(false);
     const [loadingSpottings, setLoadingSpottings] = useState(false);
     const [savingFauna, setSavingFauna] = useState(false);
@@ -248,6 +250,12 @@ const SpeciesIntelPage: React.FC = () => {
                                     24h CAMERA SPOTTINGS
                                 </span>
                             </div>
+                            <input
+                                className="hidden md:block bg-black/60 border border-vanguard-border rounded px-2 py-1 text-[10px] font-mono text-gray-200 outline-none focus:border-vanguard-species w-40"
+                                placeholder="Filter by species / zone"
+                                value={spottingsFilter}
+                                onChange={e => setSpottingsFilter(e.target.value)}
+                            />
                             {loadingSpottings && (
                                 <span className="text-[10px] font-mono text-gray-500">SYNCING…</span>
                             )}
@@ -259,7 +267,17 @@ const SpeciesIntelPage: React.FC = () => {
                                     as they are ingested.
                                 </div>
                             )}
-                            {spottings.map(spot => (
+                            {spottings
+                                .filter(spot => {
+                                    if (!spottingsFilter.trim()) return true;
+                                    const q = spottingsFilter.toLowerCase();
+                                    return (
+                                        spot.speciesCommonName.toLowerCase().includes(q) ||
+                                        (spot.scientificName || '').toLowerCase().includes(q) ||
+                                        spot.zone.toLowerCase().includes(q)
+                                    );
+                                })
+                                .map(spot => (
                                 <div key={spot.id} className="flex gap-3 p-3 hover:bg-black/40 transition-colors">
                                     <div className="relative w-20 h-20 rounded overflow-hidden border border-vanguard-border/60 shrink-0 bg-black">
                                         <img
@@ -309,6 +327,12 @@ const SpeciesIntelPage: React.FC = () => {
                                     FAUNA CATALOG
                                 </span>
                             </div>
+                            <input
+                                className="hidden md:block bg-black/60 border border-vanguard-border rounded px-2 py-1 text-[10px] font-mono text-gray-200 outline-none focus:border-vanguard-species w-40"
+                                placeholder="Search species"
+                                value={faunaFilter}
+                                onChange={e => setFaunaFilter(e.target.value)}
+                            />
                             <button
                                 onClick={handleNew}
                                 className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-mono border border-vanguard-border rounded bg-black/60 hover:bg-black"
@@ -328,7 +352,17 @@ const SpeciesIntelPage: React.FC = () => {
                                     No catalog entries yet. Use NEW ENTRY to seed the local fauna profile for this park.
                                 </div>
                             )}
-                            {fauna.map(entry => (
+                            {fauna
+                                .filter(entry => {
+                                    if (!faunaFilter.trim()) return true;
+                                    const q = faunaFilter.toLowerCase();
+                                    return (
+                                        entry.commonName.toLowerCase().includes(q) ||
+                                        entry.scientificName.toLowerCase().includes(q) ||
+                                        (entry.status || '').toLowerCase().includes(q)
+                                    );
+                                })
+                                .map(entry => (
                                 <div key={entry.id} className="p-3 flex flex-col gap-1 hover:bg-black/40 transition-colors">
                                     <div className="flex items-center justify-between">
                                         <div>

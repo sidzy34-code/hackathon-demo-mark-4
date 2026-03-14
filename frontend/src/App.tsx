@@ -7,12 +7,10 @@ import ZoneStatus from './components/ZoneStatus';
 import QuickStats from './components/QuickStats';
 import EnvironmentPanel from './components/EnvironmentPanel';
 import LandingPage from './LandingPage';
-<<<<<<< HEAD
-=======
 import SpeciesIntelPage from './SpeciesIntelPage';
->>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
 import CameraFeedsModal from './components/CameraFeedsModal';
 import CommunityReportModal from './components/CommunityReportModal';
+import SoundAnalysisModal from './components/SoundAnalysisModal';
 import RemoteController from './RemoteController';
 
 const DashboardView = () => {
@@ -20,6 +18,7 @@ const DashboardView = () => {
     const navigate = useNavigate();
     const [cameraFeedsOpen, setCameraFeedsOpen] = useState(false);
     const [communityModalOpen, setCommunityModalOpen] = useState(false);
+    const [soundAnalysisOpen, setSoundAnalysisOpen] = useState(false);
 
     if (!id) return <Navigate to="/" />;
 
@@ -29,10 +28,8 @@ const DashboardView = () => {
                 onBack={() => navigate('/')} 
                 parkId={id} 
                 onCameraFeeds={() => setCameraFeedsOpen(true)} 
-<<<<<<< HEAD
-=======
                 onSpeciesIntel={() => navigate(`/park/${id}/species`)}
->>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
+                onSoundAnalysis={() => setSoundAnalysisOpen(true)}
             />
 
             {/* Main Content Area */}
@@ -82,6 +79,9 @@ const DashboardView = () => {
             </div>
             {cameraFeedsOpen && <CameraFeedsModal parkId={id} onClose={() => setCameraFeedsOpen(false)} />}
             {communityModalOpen && <CommunityReportModal parkId={id} onClose={() => setCommunityModalOpen(false)} />}
+            {soundAnalysisOpen && (
+                <SoundAnalysisModal parkId={id} onClose={() => setSoundAnalysisOpen(false)} />
+            )}
         </div>
     );
 };
@@ -97,10 +97,7 @@ function App() {
             <Routes>
                 <Route path="/" element={<LandingWrapper />} />
                 <Route path="/park/:id" element={<DashboardView />} />
-<<<<<<< HEAD
-=======
                 <Route path="/park/:id/species" element={<SpeciesIntelPage />} />
->>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
                 <Route path="/remote" element={<RemoteController />} />
             </Routes>
         </BrowserRouter>
