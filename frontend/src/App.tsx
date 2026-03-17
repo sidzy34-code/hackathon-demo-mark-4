@@ -8,17 +8,15 @@ import QuickStats from './components/QuickStats';
 import EnvironmentPanel from './components/EnvironmentPanel';
 import LandingPage from './LandingPage';
 import SpeciesIntelPage from './SpeciesIntelPage';
-import CameraFeedsModal from './components/CameraFeedsModal';
+import CameraFeedsPage from './CameraFeedsPage';
+import SoundAnalysisPage from './SoundAnalysisPage';
 import CommunityReportModal from './components/CommunityReportModal';
-import SoundAnalysisModal from './components/SoundAnalysisModal';
 import RemoteController from './RemoteController';
 
 const DashboardView = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [cameraFeedsOpen, setCameraFeedsOpen] = useState(false);
     const [communityModalOpen, setCommunityModalOpen] = useState(false);
-    const [soundAnalysisOpen, setSoundAnalysisOpen] = useState(false);
 
     if (!id) return <Navigate to="/" />;
 
@@ -27,9 +25,7 @@ const DashboardView = () => {
             <Header 
                 onBack={() => navigate('/')} 
                 parkId={id} 
-                onCameraFeeds={() => setCameraFeedsOpen(true)} 
                 onSpeciesIntel={() => navigate(`/park/${id}/species`)}
-                onSoundAnalysis={() => setSoundAnalysisOpen(true)}
             />
 
             {/* Main Content Area */}
@@ -53,7 +49,6 @@ const DashboardView = () => {
 
                 {/* Right Side: Panels (40%) */}
                 <div className="w-[40%] h-full flex flex-col bg-vanguard-bg overflow-y-auto custom-scrollbar">
-                    
                     <div className="flex flex-col min-h-max">
                         {/* Top right panel: Live Alert Feed */}
                         <div className="border-b border-vanguard-border">
@@ -77,10 +72,9 @@ const DashboardView = () => {
                     </div>
                 </div>
             </div>
-            {cameraFeedsOpen && <CameraFeedsModal parkId={id} onClose={() => setCameraFeedsOpen(false)} />}
-            {communityModalOpen && <CommunityReportModal parkId={id} onClose={() => setCommunityModalOpen(false)} />}
-            {soundAnalysisOpen && (
-                <SoundAnalysisModal parkId={id} onClose={() => setSoundAnalysisOpen(false)} />
+
+            {communityModalOpen && (
+                <CommunityReportModal parkId={id} onClose={() => setCommunityModalOpen(false)} />
             )}
         </div>
     );
@@ -98,6 +92,8 @@ function App() {
                 <Route path="/" element={<LandingWrapper />} />
                 <Route path="/park/:id" element={<DashboardView />} />
                 <Route path="/park/:id/species" element={<SpeciesIntelPage />} />
+                <Route path="/park/:id/cameras" element={<CameraFeedsPage />} />
+                <Route path="/park/:id/sound" element={<SoundAnalysisPage />} />
                 <Route path="/remote" element={<RemoteController />} />
             </Routes>
         </BrowserRouter>

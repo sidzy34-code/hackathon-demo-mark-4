@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PARKS, AlertEvent } from './parksData';
+import { PARKS, AlertEvent, EventType, PriorityLevel } from './parksData';
 import { getRandomPointInZone } from './zoneGenerator';
 
 let sharedAlerts: AlertEvent[] = [];
@@ -54,8 +54,8 @@ function mapServerEventToAlert(data: any, park: any): AlertEvent | null {
     const payload = data.payload;
     if (!payload) return null;
 
-    let type: string;
-    let priority: string;
+    let type: EventType;
+    let priority: PriorityLevel;
 
     switch (data.type) {
         case 'ACOUSTIC_ALERT':
@@ -72,15 +72,15 @@ function mapServerEventToAlert(data: any, park: any): AlertEvent | null {
             break;
         case 'CORRELATED_INCIDENT':
             type = 'CORRELATED';
-            priority = payload.priority || 'CRITICAL';
+            priority = (payload.priority as PriorityLevel) || 'CRITICAL';
             break;
         case 'ONE_HEALTH_FLAG':
             type = 'ONE_HEALTH';
             priority = 'HIGH';
             break;
         case 'NEW_ALERT':
-            type = payload.type || 'ACOUSTIC';
-            priority = payload.priority || 'HIGH';
+            type = (payload.type as EventType) || 'ACOUSTIC';
+            priority = (payload.priority as PriorityLevel) || 'HIGH';
             break;
         default:
             return null;
@@ -88,18 +88,17 @@ function mapServerEventToAlert(data: any, park: any): AlertEvent | null {
 
     const zone = payload.zone || 'Z1';
     const zonePolygon = park?.zones?.[zone];
-    const location = zonePolygon
+    const location: [number, number] = zonePolygon
         ? getRandomPointInZone(zonePolygon)
         : park?.centerCoordinates || [0, 0];
 
     return {
         id: payload.id || `EVT-${Date.now()}`,
-        parkId: payload.parkId,
         type,
         subType: payload.subType || payload.type || type,
         zone,
         location,
-        confidence: payload.confidence ?? null,
+        confidence: payload.confidence ?? undefined,
         description: payload.description || payload.message || '',
         timestamp: formatTimestamp(payload.timestamp),
         priority,
@@ -138,7 +137,7 @@ export function useLiveAlerts(parkId?: string | null) {
                         return;
                     }
 
-                    // Selective purge — remove specific IDs from shared state
+                    // Selective purge — remove specific IDs
                     if (data.type === 'SELECTIVE_PURGE') {
                         const removedIds = new Set(data.payload?.ids || []);
                         sharedAlerts = sharedAlerts.filter(a => !removedIds.has(a.id));
@@ -158,6 +157,7 @@ export function useLiveAlerts(parkId?: string | null) {
                         return;
                     }
 
+                    // Filter by park
                     const eventParkId = data.payload?.parkId;
                     if (eventParkId && eventParkId !== currentParkId) return;
 

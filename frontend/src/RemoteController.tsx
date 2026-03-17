@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, Activity, ShieldAlert, Users, Trash2, Smartphone, MapPin, CheckCircle2, Scissors, Truck, Biohazard, Eye, ListX, ChevronDown, ChevronUp, Radio, Camera } from 'lucide-react';
+import { Zap, ShieldAlert, Users, Trash2, Smartphone, MapPin, CheckCircle2, Scissors, Truck, Biohazard, Eye, ListX, ChevronDown, ChevronUp, Radio, Camera } from 'lucide-react';
 import { PARKS } from './lib/parksData';
 
 interface LiveAlert {
@@ -47,7 +47,6 @@ const RemoteController: React.FC = () => {
         }
     };
 
-    // Fetch live alerts from backend filtered by selected park
     const fetchAlerts = async () => {
         setLoadingAlerts(true);
         try {
@@ -62,7 +61,6 @@ const RemoteController: React.FC = () => {
         }
     };
 
-    // Refresh alerts when selective purge panel opens or park changes
     useEffect(() => {
         if (selectivePurgeOpen) fetchAlerts();
     }, [selectivePurgeOpen, selectedPark]);
@@ -108,8 +106,8 @@ const RemoteController: React.FC = () => {
 
     const getAlertTypeIcon = (type: string) => {
         switch (type) {
-            case 'ACOUSTIC': return <Radio size={12} className="text-red-400" />;
-            case 'CAMERA':   return <Camera size={12} className="text-amber-400" />;
+            case 'ACOUSTIC':  return <Radio size={12} className="text-red-400" />;
+            case 'CAMERA':    return <Camera size={12} className="text-amber-400" />;
             case 'COMMUNITY': return <Users size={12} className="text-blue-400" />;
             default:          return <ShieldAlert size={12} className="text-gray-400" />;
         }
@@ -134,13 +132,13 @@ const RemoteController: React.FC = () => {
     ];
 
     const visionButtons = [
-        { label: 'HUMAN',   color: 'amber', icon: <ShieldAlert size={22} />, payload: { parkId: selectedPark, zone: selectedZone, type: 'CAMERA', subType: 'HUMAN_PRESENCE',    confidence: 0.88, description: 'Unauthorized individual detected by camera trap.' } },
-        { label: 'VEHICLE', color: 'amber', icon: <MapPin size={22} />,      payload: { parkId: selectedPark, zone: selectedZone, type: 'CAMERA', subType: 'VEHICLE_DETECTED',  confidence: 0.85, description: 'Suspicious motor vehicle detected on camera.' } },
-        { label: 'ANOMALY', color: 'amber', icon: <Eye size={22} />,         payload: { parkId: selectedPark, zone: selectedZone, type: 'CAMERA', subType: 'BEHAVIORAL_ANOMALY',confidence: 0.82, description: 'Unusual animal behavioral pattern — possible stress or injury.' } },
+        { label: 'HUMAN',   color: 'amber', icon: <ShieldAlert size={22} />, payload: { parkId: selectedPark, zone: selectedZone, type: 'CAMERA', subType: 'HUMAN_PRESENCE',     confidence: 0.88, description: 'Unauthorized individual detected by camera trap.' } },
+        { label: 'VEHICLE', color: 'amber', icon: <MapPin size={22} />,      payload: { parkId: selectedPark, zone: selectedZone, type: 'CAMERA', subType: 'VEHICLE_DETECTED',   confidence: 0.85, description: 'Suspicious motor vehicle detected on camera.' } },
+        { label: 'ANOMALY', color: 'amber', icon: <Eye size={22} />,         payload: { parkId: selectedPark, zone: selectedZone, type: 'CAMERA', subType: 'BEHAVIORAL_ANOMALY', confidence: 0.82, description: 'Unusual animal behavioral pattern — possible stress or injury.' } },
     ];
 
     const communityButtons = [
-        { label: 'SNARE LINE',  color: 'teal', icon: <Users size={22} />,       payload: { parkId: selectedPark, zone: selectedZone, type: 'COMMUNITY', subType: 'SNARE_DETECTED', description: 'Active wire snare line reported by community member.' } },
+        { label: 'SNARE LINE',  color: 'teal', icon: <Users size={22} />,        payload: { parkId: selectedPark, zone: selectedZone, type: 'COMMUNITY', subType: 'SNARE_DETECTED', description: 'Active wire snare line reported by community member.' } },
         { label: 'CAMP FOUND',  color: 'teal', icon: <CheckCircle2 size={22} />, payload: { parkId: selectedPark, zone: selectedZone, type: 'COMMUNITY', subType: 'POACHER_CAMP',  description: 'Evidence of recent illegal encampment discovered.' } },
         { label: 'DEAD ANIMAL', color: 'teal', icon: <Biohazard size={22} />,    payload: { parkId: selectedPark, zone: selectedZone, type: 'COMMUNITY', subType: 'DEAD_ANIMAL',   description: 'Dead wildlife reported — possible poaching or disease.' } },
     ];
@@ -160,9 +158,7 @@ const RemoteController: React.FC = () => {
                 onClick={() => triggerWebhook(endpoint, btn.payload)}
                 className={`p-4 bg-[#0A0F1A] border ${c.border} rounded-lg flex flex-col items-center justify-center gap-2 active:scale-95 transition-transform group`}
             >
-                <div className={`p-2.5 ${c.bg} rounded-full ${c.text} transition-colors`}>
-                    {btn.icon}
-                </div>
+                <div className={`p-2.5 ${c.bg} rounded-full ${c.text} transition-colors`}>{btn.icon}</div>
                 <span className={`text-[9px] font-mono font-bold tracking-widest ${c.text}`}>{btn.label}</span>
             </button>
         );
@@ -244,7 +240,7 @@ const RemoteController: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2">{communityButtons.map(btn => renderButton(btn, 'community'))}</div>
             </div>
 
-            {/* ── SELECTIVE PURGE ───────────────────────────────── */}
+            {/* Selective Purge */}
             <div className="mb-3 border border-white/10 rounded-lg overflow-hidden">
                 <button
                     onClick={() => setSelectivePurgeOpen(p => !p)}
@@ -259,23 +255,14 @@ const RemoteController: React.FC = () => {
 
                 {selectivePurgeOpen && (
                     <div className="p-3 bg-[#080D18] border-t border-white/10">
-                        {/* Park filter note */}
                         <div className="text-[9px] font-mono text-gray-500 mb-3 tracking-widest">
                             SHOWING ALERTS FOR: <span className="text-orange-400">{park?.name?.toUpperCase()}</span>
                         </div>
-
-                        {/* Controls row */}
                         <div className="flex items-center justify-between mb-3 gap-2">
-                            <button
-                                onClick={toggleSelectAll}
-                                className="text-[10px] font-mono text-gray-400 border border-white/10 px-3 py-1.5 rounded hover:bg-white/10 transition-colors"
-                            >
+                            <button onClick={toggleSelectAll} className="text-[10px] font-mono text-gray-400 border border-white/10 px-3 py-1.5 rounded hover:bg-white/10 transition-colors">
                                 {selectedAlertIds.size === liveAlerts.length && liveAlerts.length > 0 ? 'DESELECT ALL' : 'SELECT ALL'}
                             </button>
-                            <button
-                                onClick={fetchAlerts}
-                                className="text-[10px] font-mono text-gray-400 border border-white/10 px-3 py-1.5 rounded hover:bg-white/10 transition-colors"
-                            >
+                            <button onClick={fetchAlerts} className="text-[10px] font-mono text-gray-400 border border-white/10 px-3 py-1.5 rounded hover:bg-white/10 transition-colors">
                                 ↻ REFRESH
                             </button>
                             <button
@@ -290,41 +277,25 @@ const RemoteController: React.FC = () => {
                                 PURGE {selectedAlertIds.size > 0 ? `(${selectedAlertIds.size})` : ''}
                             </button>
                         </div>
-
-                        {/* Alert list */}
                         <div className="max-h-64 overflow-y-auto space-y-1.5 no-scrollbar">
-                            {loadingAlerts && (
-                                <div className="text-[10px] font-mono text-gray-500 text-center py-4">LOADING ALERTS…</div>
-                            )}
-                            {!loadingAlerts && liveAlerts.length === 0 && (
-                                <div className="text-[10px] font-mono text-gray-600 text-center py-4">NO ACTIVE ALERTS FOR THIS PARK</div>
-                            )}
+                            {loadingAlerts && <div className="text-[10px] font-mono text-gray-500 text-center py-4">LOADING ALERTS…</div>}
+                            {!loadingAlerts && liveAlerts.length === 0 && <div className="text-[10px] font-mono text-gray-600 text-center py-4">NO ACTIVE ALERTS FOR THIS PARK</div>}
                             {!loadingAlerts && liveAlerts.map(alert => {
                                 const isSelected = selectedAlertIds.has(alert.id);
                                 return (
-                                    <div
-                                        key={alert.id}
-                                        onClick={() => toggleAlertSelection(alert.id)}
+                                    <div key={alert.id} onClick={() => toggleAlertSelection(alert.id)}
                                         className={`flex items-start gap-3 p-2.5 rounded border cursor-pointer transition-all ${
-                                            isSelected
-                                                ? 'border-orange-500/50 bg-orange-500/10'
-                                                : `${getAlertBorderColor(alert.type)} bg-black/30 hover:bg-white/5`
-                                        }`}
-                                    >
-                                        {/* Checkbox */}
+                                            isSelected ? 'border-orange-500/50 bg-orange-500/10' : `${getAlertBorderColor(alert.type)} bg-black/30 hover:bg-white/5`
+                                        }`}>
                                         <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
                                             isSelected ? 'bg-orange-500 border-orange-500' : 'border-gray-600 bg-transparent'
                                         }`}>
                                             {isSelected && <span className="text-black text-[10px] font-bold">✓</span>}
                                         </div>
-
-                                        {/* Content */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-1.5 mb-0.5">
                                                 {getAlertTypeIcon(alert.type)}
-                                                <span className="text-[11px] font-mono font-bold text-white truncate">
-                                                    {alert.subType?.replace(/_/g, ' ')}
-                                                </span>
+                                                <span className="text-[11px] font-mono font-bold text-white truncate">{alert.subType?.replace(/_/g, ' ')}</span>
                                                 <span className="text-[9px] font-mono text-gray-500 ml-auto shrink-0">{alert.zone}</span>
                                             </div>
                                             <p className="text-[10px] text-gray-400 leading-tight line-clamp-1">{alert.description}</p>
@@ -338,7 +309,7 @@ const RemoteController: React.FC = () => {
                 )}
             </div>
 
-            {/* ── FULL SYSTEM PURGE ─────────────────────────────── */}
+            {/* Full System Purge */}
             <div className="mt-auto pb-4">
                 <button
                     onClick={() => { triggerHaptic([50, 100, 50]); triggerWebhook('clear', {}); }}
