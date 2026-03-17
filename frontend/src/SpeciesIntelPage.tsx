@@ -12,6 +12,7 @@ interface FaunaEntry {
     estimatedCount: number;
     status?: string;
     notes?: string;
+    citation?: string;
 }
 
 interface Spotting {
@@ -89,6 +90,7 @@ const SpeciesIntelPage: React.FC = () => {
             estimatedCount: 0,
             status: '',
             notes: '',
+            citation: '',
         });
         setIsNewEntry(true);
     };
@@ -116,6 +118,7 @@ const SpeciesIntelPage: React.FC = () => {
             estimatedCount: Number(editingEntry.estimatedCount) || 0,
             status: editingEntry.status || '',
             notes: editingEntry.notes || '',
+            citation: editingEntry.citation ?? '',
         };
 
         try {
@@ -388,6 +391,11 @@ const SpeciesIntelPage: React.FC = () => {
                                     {entry.notes && (
                                         <div className="text-[10px] font-mono text-gray-500">
                                             {entry.notes}
+                                        </div>
+                                    )}
+                                    {entry.citation && (
+                                        <div className="text-[9px] font-mono text-gray-600 italic">
+                                            Source: {entry.citation}
                                         </div>
                                     )}
                                     <div className="flex items-center justify-end gap-2 mt-1">

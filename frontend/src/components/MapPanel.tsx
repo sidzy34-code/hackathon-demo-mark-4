@@ -3,9 +3,7 @@ import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-l
 import L from 'leaflet';
 import { PARKS } from '../lib/parksData';
 import { useLiveAlerts } from '../lib/liveStream';
-import { MOCK_ZONES_STATUS } from '../lib/mockData'; // Keep this import as it's used for zone status
 
-// Custom icons for map markers
 const createCustomIcon = (color: string, iconHtml: string, isPulse: boolean = false) => {
     return L.divIcon({
         className: 'custom-div-icon',
@@ -39,12 +37,24 @@ interface MapPanelProps {
 }
 
 const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
-    // Find selected park center
     const park = PARKS.find(p => p.id === parkId) || PARKS[0];
     const { alerts, predictiveState } = useLiveAlerts(parkId || PARKS[0].id);
 
     const center = park.centerCoordinates;
     const zones = park.zones;
+
+    // Derive zone status dynamically from live alerts — same logic as ZoneStatus.tsx
+    const zoneStatusMap: Record<string, string> = {};
+    Array.from({ length: 8 }, (_, i) => `Z${i + 1}`).forEach(zoneId => {
+        const zoneAlerts = alerts.filter(a => a.zone === zoneId);
+        if (zoneAlerts.some(a => a.priority === 'CRITICAL' || a.priority === 'HIGH')) {
+            zoneStatusMap[zoneId] = 'ACTIVE';
+        } else if (zoneAlerts.length > 0) {
+            zoneStatusMap[zoneId] = 'MONITORING';
+        } else {
+            zoneStatusMap[zoneId] = 'CLEAR';
+        }
+    });
 
     return (
         <div className="w-full h-full relative" id="map-container">
@@ -56,20 +66,17 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
             >
                 <MapUpdater center={center} />
 
-                {/* CartoDB Dark Matter */}
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
                 />
 
-                {/* Zones Polygons */}
                 {Object.entries(zones).map(([zoneId, coords]) => {
-                    const status = MOCK_ZONES_STATUS.find(z => z.id === zoneId)?.status;
+                    const status = zoneStatusMap[zoneId] || 'CLEAR';
                     let color = '#059669'; // CLEAR
                     if (status === 'MONITORING') color = '#D97706';
                     if (status === 'ACTIVE') color = '#DC2626';
 
-                    // Predictive Threat MVP Logic
                     const isVulnerable = predictiveState?.recommendedPatrolZones.includes(zoneId);
 
                     return (
@@ -93,8 +100,7 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
                                     </div>
                                 </Popup>
                             </Polygon>
-                            
-                            {/* Predictive Heatmap Overlay Layer */}
+
                             {isVulnerable && (
                                 <Polygon
                                     positions={coords as [number, number][]}
@@ -104,7 +110,7 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
                                         fillOpacity: 0.15,
                                         weight: 2,
                                         dashArray: '10, 10',
-                                        className: 'animate-pulse' // Tailwind class for the radar glow effect
+                                        className: 'animate-pulse'
                                     }}
                                     interactive={false}
                                 />
@@ -113,7 +119,6 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
                     );
                 })}
 
-                {/* Mock Markers */}
                 {alerts.map((alert) => (
                     <Marker
                         key={alert.id}
@@ -137,7 +142,6 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
                 ))}
             </MapContainer>
 
-            {/* Overlay map controls or legends here if needed */}
             <div className="absolute top-4 right-4 z-[400] bg-vanguard-panel/90 border border-vanguard-border backdrop-blur p-2 rounded text-xs flex flex-col gap-2 shadow-xl">
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-vanguard-zoneClear"></div><span>Clear</span></div>
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-vanguard-zoneMonitor"></div><span>Monitoring</span></div>

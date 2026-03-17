@@ -61,7 +61,7 @@ const EnvironmentPanel: React.FC<EnvironmentPanelProps> = ({ parkId }) => {
                 <div className="flex items-center gap-1.5">
                     {env ? (
                         <span className="text-[10px] font-mono text-green-500 flex items-center gap-1">
-                            <Wifi size={10} /> LIVE
+                            <Wifi size={10} /> {(env as { dataSource?: string }).dataSource === 'open-meteo' ? 'LIVE (Open-Meteo)' : 'OFFLINE'}
                         </span>
                     ) : loading ? (
                         <span className="text-[10px] font-mono text-gray-500">FETCHING...</span>
@@ -142,7 +142,9 @@ const EnvironmentPanel: React.FC<EnvironmentPanelProps> = ({ parkId }) => {
             {env?.weatherDescription && env.weatherDescription !== 'Data unavailable' && (
                 <div className="text-[10px] font-mono text-gray-600 text-center">
                     {env.weatherDescription}
-                    {(env as any).fallback && <span className="ml-1 text-gray-700">(weather API fallback)</span>}
+                    {(env as { dataSource?: string }).dataSource !== 'open-meteo' && (
+                        <span className="ml-1 text-gray-500">(demo – set backend for live Open-Meteo)</span>
+                    )}
                 </div>
             )}
         </div>

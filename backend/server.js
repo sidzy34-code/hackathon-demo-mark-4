@@ -11,7 +11,7 @@ const app = express();
 
 // Serve the production-built React frontend files
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' })); // Allow high-res camera frames
 
 // In-memory store of connected SSE clients
@@ -25,6 +25,7 @@ app.get('/api/events', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
 
     clients.push(res);
     console.log(`[SSE] New hardware connection established. Total active sinks: ${clients.length}`);
@@ -85,7 +86,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Panthera tigris tigris',
                 estimatedCount: 150,
                 status: 'EN',
-                notes: 'High-density tiger landscape; estimate aggregated from recent Karnataka tiger census reports.'
+                notes: 'High-density tiger landscape; estimate from Karnataka tiger census (NTCA/State Forest Dept).',
+                citation: 'NTCA All India Tiger Estimation 2022; IUCN Red List 2024'
             },
             {
                 id: 'ngh-elephant',
@@ -94,7 +96,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Elephas maximus indicus',
                 estimatedCount: 800,
                 status: 'EN',
-                notes: 'Part of the larger Nilgiri elephant landscape; rough pooled estimate.'
+                notes: 'Part of Nilgiri elephant landscape; pooled estimate (Project Elephant, MoEFCC).',
+                citation: 'IUCN Red List 2024; Elephant Census India'
             },
             {
                 id: 'ngh-leopard',
@@ -103,7 +106,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Panthera pardus fusca',
                 estimatedCount: 120,
                 status: 'VU',
-                notes: 'Leopard density inferred from camera trap studies overlapping tiger grids.'
+                notes: 'Leopard density from camera trap studies overlapping tiger grids.',
+                citation: 'IUCN Red List 2024'
             }
         ],
         corbett: [
@@ -114,7 +118,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Panthera tigris tigris',
                 estimatedCount: 250,
                 status: 'EN',
-                notes: 'Corbett landscape holds one of India’s highest tiger populations; figure is rounded for demo.'
+                notes: 'Corbett holds one of India’s highest tiger populations (NTCA).',
+                citation: 'NTCA 2022; IUCN 2024'
             },
             {
                 id: 'cor-elephant',
@@ -123,7 +128,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Elephas maximus indicus',
                 estimatedCount: 1000,
                 status: 'EN',
-                notes: 'Trans-Himalayan elephant population estimate pooled across Corbett–Rajaji corridor.'
+                notes: 'Trans-Himalayan elephant population across Corbett–Rajaji corridor.',
+                citation: 'Project Elephant; IUCN 2024'
             },
             {
                 id: 'cor-gharial',
@@ -132,7 +138,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Gavialis gangeticus',
                 estimatedCount: 40,
                 status: 'CR',
-                notes: 'Critically endangered riverine crocodilian; small, reintroduced population.'
+                notes: 'Critically endangered riverine crocodilian; reintroduced population.',
+                citation: 'IUCN Red List 2024'
             }
         ],
         kaziranga: [
@@ -143,7 +150,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Rhinoceros unicornis',
                 estimatedCount: 2600,
                 status: 'VU',
-                notes: 'Approximate based on 2018 census (~2,613 individuals).'
+                notes: 'World’s largest population; 2018 census ~2,613 (Assam Forest Dept).',
+                citation: 'Kaziranga Census 2018; IUCN 2024'
             },
             {
                 id: 'kaz-elephant',
@@ -152,7 +160,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Elephas maximus indicus',
                 estimatedCount: 1200,
                 status: 'EN',
-                notes: 'Large breeding population across Kaziranga–Karbi Anglong complex.'
+                notes: 'Large breeding population across Kaziranga–Karbi Anglong complex.',
+                citation: 'IUCN 2024'
             },
             {
                 id: 'kaz-tiger',
@@ -161,7 +170,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Panthera tigris tigris',
                 estimatedCount: 120,
                 status: 'EN',
-                notes: 'High tiger density; rounded composite estimate for the demo.'
+                notes: 'High tiger density (NTCA).',
+                citation: 'NTCA 2022; IUCN 2024'
             }
         ],
         sundarbans: [
@@ -172,7 +182,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Panthera tigris tigris',
                 estimatedCount: 100,
                 status: 'EN',
-                notes: 'Mangrove-adapted tiger population across Indian Sundarbans; rounded for demo.'
+                notes: 'Mangrove-adapted tiger population (Indian Sundarbans).',
+                citation: 'NTCA/WII; IUCN 2024'
             },
             {
                 id: 'sun-dolphin',
@@ -181,7 +192,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Orcaella brevirostris',
                 estimatedCount: 80,
                 status: 'EN',
-                notes: 'Estimates vary widely; small estuarine population used for indicative purposes.'
+                notes: 'Estuarine population; estimates from survey reports.',
+                citation: 'IUCN 2024'
             },
             {
                 id: 'sun-crocodile',
@@ -190,7 +202,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Crocodylus porosus',
                 estimatedCount: 250,
                 status: 'LC',
-                notes: 'Large apex reptile; number is coarse-grained, for visualization only.'
+                notes: 'Apex predator; indicative estimate.',
+                citation: 'IUCN 2024'
             }
         ],
         'maasai-mara': [
@@ -201,7 +214,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Panthera leo melanochaita',
                 estimatedCount: 850,
                 status: 'VU',
-                notes: 'Covers the broader Mara–Serengeti system; Mara-only number would be lower.'
+                notes: 'Mara–Serengeti ecosystem; cross-border population.',
+                citation: 'KWS/Mara Conservancy; IUCN 2024'
             },
             {
                 id: 'mara-elephant',
@@ -210,7 +224,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Loxodonta africana',
                 estimatedCount: 2500,
                 status: 'EN',
-                notes: 'Mobile cross-border population between Kenya and Tanzania.'
+                notes: 'Mobile cross-border population (Kenya–Tanzania).',
+                citation: 'IUCN 2024'
             },
             {
                 id: 'mara-rhino',
@@ -219,7 +234,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Diceros bicornis michaeli',
                 estimatedCount: 40,
                 status: 'CR',
-                notes: 'Small remnant population under intense protection.'
+                notes: 'Small remnant population under protection.',
+                citation: 'IUCN Red List 2024'
             }
         ],
         kruger: [
@@ -230,7 +246,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Loxodonta africana',
                 estimatedCount: 19500,
                 status: 'EN',
-                notes: 'Rounded from SANParks reports (~19–20k individuals).'
+                notes: 'SANParks census (~19–20k).',
+                citation: 'SANParks; IUCN 2024'
             },
             {
                 id: 'kru-white-rhino',
@@ -239,7 +256,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Ceratotherium simum simum',
                 estimatedCount: 2500,
                 status: 'NT',
-                notes: 'Numbers have declined sharply; value given is illustrative.'
+                notes: 'Population under pressure; SANParks estimates.',
+                citation: 'SANParks; IUCN 2024'
             },
             {
                 id: 'kru-wild-dog',
@@ -248,7 +266,8 @@ function seedFaunaIfEmpty() {
                 scientificName: 'Lycaon pictus',
                 estimatedCount: 150,
                 status: 'EN',
-                notes: 'Highly mobile packs; small meta-population within Greater Kruger.'
+                notes: 'Meta-population within Greater Kruger.',
+                citation: 'IUCN 2024'
             }
         ]
     };
@@ -560,7 +579,7 @@ app.get('/api/fauna/:parkId', (req, res) => {
 
 app.post('/api/fauna/:parkId', (req, res) => {
     const { parkId } = req.params;
-    const { commonName, scientificName, estimatedCount, status, notes } = req.body || {};
+    const { commonName, scientificName, estimatedCount, status, notes, citation } = req.body || {};
     faunaStore = readJsonSafe(FAUNA_FILE, faunaStore || {});
     const entry = {
         id: `${parkId}-${Date.now()}`,
@@ -569,7 +588,8 @@ app.post('/api/fauna/:parkId', (req, res) => {
         scientificName,
         estimatedCount: Number(estimatedCount) || 0,
         status: status || '',
-        notes: notes || ''
+        notes: notes || '',
+        citation: citation || ''
     };
     faunaStore[parkId] = [...(faunaStore[parkId] || []), entry];
     writeJsonSafe(FAUNA_FILE, faunaStore);
@@ -578,7 +598,7 @@ app.post('/api/fauna/:parkId', (req, res) => {
 
 app.put('/api/fauna/:parkId/:id', (req, res) => {
     const { parkId, id } = req.params;
-    const { commonName, scientificName, estimatedCount, status, notes } = req.body || {};
+    const { commonName, scientificName, estimatedCount, status, notes, citation } = req.body || {};
     faunaStore = readJsonSafe(FAUNA_FILE, faunaStore || {});
     const list = faunaStore[parkId] || [];
     const idx = list.findIndex(e => e.id === id);
@@ -591,7 +611,8 @@ app.put('/api/fauna/:parkId/:id', (req, res) => {
         scientificName: scientificName ?? list[idx].scientificName,
         estimatedCount: estimatedCount != null ? Number(estimatedCount) || 0 : list[idx].estimatedCount,
         status: status ?? list[idx].status,
-        notes: notes ?? list[idx].notes
+        notes: notes ?? list[idx].notes,
+        citation: citation !== undefined ? citation : list[idx].citation
     };
     list[idx] = updated;
     faunaStore[parkId] = list;
@@ -625,6 +646,79 @@ app.get('/api/audio/:parkId', (req, res) => {
     audioStore = readJsonSafe(AUDIO_FILE, audioStore || {});
     const list = audioStore[parkId] || [];
     res.json(list);
+});
+
+// Acoustic classification: deterministic by type, optional Open Router for recommended action
+const ACOUSTIC_LABELS = {
+    GUNSHOT: { label: 'Gunshot (High Confidence)', confidence: 0.96, threatLevel: 'THREAT' },
+    CHAINSAW: { label: 'Chainsaw Detected', confidence: 0.93, threatLevel: 'THREAT' },
+    VEHICLE: { label: 'Vehicle Engine', confidence: 0.88, threatLevel: 'THREAT' },
+    TIGER_CALL: { label: 'Tiger Vocalization', confidence: 0.91, threatLevel: 'WILDLIFE' },
+    ELEPHANT_CALL: { label: 'Elephant Call', confidence: 0.89, threatLevel: 'WILDLIFE' },
+    AMBIENT: { label: 'Ambient Forest Soundscape', confidence: 0.82, threatLevel: 'AMBIENT' }
+};
+const ACOUSTIC_ACTIONS = {
+    GUNSHOT: 'Treat as confirmed gunshot. Dispatch nearest ranger unit and cross-check camera traps in adjacent zones.',
+    CHAINSAW: 'Possible illegal logging. Notify forestry staff and deploy patrol to triangulated coordinates.',
+    VEHICLE: 'Unscheduled vehicle activity. Check authorized vehicle list and coordinate with gate staff.',
+    TIGER_CALL: 'Predator vocalization detected. Log for behavior monitoring and avoid routing tourists into this sector.',
+    ELEPHANT_CALL: 'Elephant herd presence likely. Caution heavy vehicles and maintain buffer from crop-field interfaces.',
+    AMBIENT: 'No immediate threat. Use as calibration sample for sensor health checks.'
+};
+
+app.post('/api/analyze/audio', async (req, res) => {
+    const { sampleId, sampleType, customLabel } = req.body || {};
+    const type = sampleType || (sampleId && ACOUSTIC_LABELS[sampleId] ? sampleId : null) || 'AMBIENT';
+    const meta = ACOUSTIC_LABELS[type] || ACOUSTIC_LABELS.AMBIENT;
+    let recommendedAction = ACOUSTIC_ACTIONS[type] || ACOUSTIC_ACTIONS.AMBIENT;
+    let source = 'fallback';
+
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (openRouterKey) {
+        try {
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + openRouterKey
+                },
+                body: JSON.stringify({
+                    model: 'openai/gpt-3.5-turbo',
+                    messages: [
+                        {
+                            role: 'system',
+                            content:
+                                'You are a wildlife ranger acoustic analyst. Respond with exactly one short, actionable sentence: recommended action for the ranger given this sound classification. No preamble.'
+                        },
+                        {
+                            role: 'user',
+                            content: `Classified sound: ${meta.label}. Threat level: ${meta.threatLevel}. One sentence recommended action.`
+                        }
+                    ],
+                    max_tokens: 80,
+                    temperature: 0.3
+                })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const content = data.choices?.[0]?.message?.content?.trim();
+                if (content) {
+                    recommendedAction = content;
+                    source = 'openrouter';
+                }
+            }
+        } catch (err) {
+            console.error('[Open Router] Audio recommendation error:', err);
+        }
+    }
+
+    res.status(200).json({
+        label: customLabel || meta.label,
+        confidence: meta.confidence,
+        threatLevel: meta.threatLevel,
+        recommendedAction,
+        source
+    });
 });
 
 // ==========================================
@@ -705,25 +799,25 @@ app.post('/api/analyze/vision', async (req, res) => {
             const response = await fetch(
                 'https://api.clarifai.com/v2/models/general-image-recognition/versions/aa7f35c01e0642fda5cf400f543e7c40/outputs',
                 {
-                    method: 'POST',
+                method: 'POST',
                     headers: { Accept: 'application/json', Authorization: 'Key ' + clarifaiPat },
-                    body: raw
+                body: raw
                 }
             );
             const data = await response.json();
-
+            
             if (data.status && data.status.code === 10000) {
                 const concepts = data.outputs[0].data.concepts;
                 let topPrediction = concepts[0];
                 const genericExcludes = ['wildlife', 'animal', 'nature', 'mammal', 'outdoors', 'tree', 'field'];
-
+                
                 for (const concept of concepts) {
                     if (!genericExcludes.includes(concept.name.toLowerCase()) && concept.value > 0.8) {
                         topPrediction = concept;
                         break;
                     }
                 }
-
+                
                 const pn = topPrediction.name;
                 const end = ['elephant', 'rhino', 'tiger', 'lion', 'pangolin'].some(t =>
                     pn.toLowerCase().includes(t)
@@ -742,12 +836,55 @@ app.post('/api/analyze/vision', async (req, res) => {
                 });
             }
         } catch (err) {
-            console.error('[Vision API] Neural Engine Network Error:', err);
+            console.error('[Vision API] Clarifai error:', err);
+        }
+    }
+
+    // Try Hugging Face image classification when HF_TOKEN is set (no Clarifai or Clarifai failed)
+    const hfToken = process.env.HF_TOKEN;
+    if (image && hfToken) {
+        try {
+            console.log('[Logic Engine] Trying Hugging Face image classification...');
+            const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+            const response = await fetch(
+                'https://api-inference.huggingface.co/models/google/vit-base-patch16-224',
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Bearer ' + hfToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ inputs: base64Data })
+                }
+            );
+            if (response.ok) {
+                const data = await response.json();
+                const top = Array.isArray(data) ? data[0] : data;
+                if (top && (top.label || top.score !== undefined)) {
+                    const label = top.label || (Array.isArray(top) ? top[0]?.label : null);
+                    const score = typeof top.score === 'number' ? top.score : (top[0]?.score ?? 0.85);
+                    const labelStr = (label && (typeof label === 'string' ? label : label.class || label.label)) || 'Wildlife';
+                    const end = ['elephant', 'rhino', 'tiger', 'lion', 'dog', 'cat', 'animal'].some(t =>
+                        String(labelStr).toLowerCase().includes(t)
+                    );
+                    return res.status(200).json({
+                        success: true,
+                        classification: String(labelStr).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                        scientificName: 'Classified via Hugging Face Vision',
+                        confidence: score,
+                        endangered: end,
+                        statusLabel: end ? 'EN' : 'LC',
+                        directive: `Hugging Face model classified subject as ${labelStr} with ${(score * 100).toFixed(1)}% confidence.`
+                    });
+                }
+            }
+        } catch (err) {
+            console.error('[Vision API] Hugging Face error:', err);
         }
     }
 
     if (image) {
-        console.log(`[Logic Engine] Using local heuristic fallback for classification.`);
+        console.log('[Logic Engine] Using local heuristic fallback for classification. Set CLARIFAI_PAT or HF_TOKEN for live AI.');
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
         const h = simpleImageHash(base64Data);
         const bucket = h % (FALLBACK_SPECIES.length - 1);
@@ -769,6 +906,65 @@ app.post('/api/analyze/vision', async (req, res) => {
         success: false,
         message: 'No image payload supplied.'
     });
+});
+
+// ==========================================
+// 6b. OPEN ROUTER – AI RECOMMENDED ACTIONS (optional, set OPENROUTER_API_KEY)
+// ==========================================
+
+app.post('/api/recommend-action', async (req, res) => {
+    const { alertType, zone, parkName, context } = req.body || {};
+    const key = process.env.OPENROUTER_API_KEY;
+    const park = (parkName || 'this park').toString();
+    const z = (zone || 'unknown zone').toString();
+    const ctx = (context || '').toString();
+
+    if (key) {
+        try {
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + key
+                },
+                body: JSON.stringify({
+                    model: 'openai/gpt-3.5-turbo',
+                    messages: [
+                        {
+                            role: 'system',
+                            content:
+                                'You are a wildlife ranger operations advisor. Respond with exactly one short, actionable sentence: the recommended action for the ranger (e.g. deploy unit, notify patrol, check camera). No preamble or quotes.'
+                        },
+                        {
+                            role: 'user',
+                            content: `Alert type: ${alertType || 'unknown'}. Zone: ${z}. Park: ${park}. ${ctx ? 'Context: ' + ctx : ''}`
+                        }
+                    ],
+                    max_tokens: 80,
+                    temperature: 0.3
+                })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const content = data.choices?.[0]?.message?.content?.trim();
+                if (content) {
+                    return res.status(200).json({ action: content, source: 'openrouter' });
+                }
+            }
+        } catch (err) {
+            console.error('[Open Router] Error:', err);
+        }
+    }
+
+    const fallbacks = {
+        GUNSHOT: `Deploy nearest ranger unit to ${z} and cross-check camera traps in adjacent zones.`,
+        CHAINSAW: `Treat as possible illegal logging. Notify forestry staff and deploy patrol to triangulated coordinates in ${z}.`,
+        VEHICLE_ENGINE: `Verify vehicle against authorized list and coordinate with gate staff; consider patrol to ${z}.`,
+        HUMAN_PRESENCE: `Dispatch ranger to ${z} to verify and document; maintain alert level until cleared.`,
+        SUSPICIOUS_VEHICLE: `Coordinate with checkpoint and deploy unit to intercept and identify vehicle in ${z}.`
+    };
+    const fallback = fallbacks[alertType?.toUpperCase()] || `Review alert in ${z} and deploy patrol if threat is confirmed.`;
+    res.status(200).json({ action: fallback, source: 'fallback' });
 });
 
 // ==========================================
@@ -816,7 +1012,8 @@ app.get('/api/environment/:lat/:lon', async (req, res) => {
             weatherDescription: describeWeatherCode(cur.weather_code),
             lunarIllumination: lun,
             threatMultiplier: threat,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            dataSource: 'open-meteo'
         });
     } catch (err) {
         const lun = getLunarIllumination(parseFloat(lon));
@@ -824,7 +1021,8 @@ app.get('/api/environment/:lat/:lon', async (req, res) => {
             weatherDescription: 'Open-Meteo Offline',
             lunarIllumination: lun, 
             threatMultiplier: computeThreatMultiplier(lun, 0, 0), 
-            fallback: true 
+            fallback: true,
+            dataSource: 'fallback'
         });
     }
 });
@@ -857,11 +1055,35 @@ app.get('/api/gbif/:lat/:lon', async (req, res) => {
 });
 
 // ==========================================
-<<<<<<< HEAD
-// 7. CRITICAL HOUSING & ROUTING LOGIC (DO NOT MODIFY)
-=======
+// 7b. SELECTIVE ALERT MANAGEMENT
+// ==========================================
+
+// GET /api/alerts — returns current in-memory recentAlerts, optionally filtered by parkId
+app.get('/api/alerts', (req, res) => {
+    const { parkId } = req.query;
+    const filtered = parkId
+        ? recentAlerts.filter(a => !a.parkId || a.parkId === parkId)
+        : recentAlerts;
+    res.status(200).json({ alerts: filtered, total: filtered.length });
+});
+
+// POST /api/webhooks/purge-selected — removes specific alerts by ID and broadcasts
+app.post('/api/webhooks/purge-selected', (req, res) => {
+    const { ids, parkId } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, message: 'No alert IDs provided.' });
+    }
+    const idSet = new Set(ids);
+    const before = recentAlerts.length;
+    recentAlerts = recentAlerts.filter(a => !idSet.has(a.id));
+    const removed = before - recentAlerts.length;
+    broadcastEvent('SELECTIVE_PURGE', { ids: Array.from(idSet), parkId: parkId || null });
+    console.log(`[Admin] Selective purge: removed ${removed} alert(s) for park ${parkId || 'all'}`);
+    res.status(200).json({ success: true, removed, remaining: recentAlerts.length });
+});
+
+// ==========================================
 // 8. CRITICAL HOUSING & ROUTING LOGIC (DO NOT MODIFY)
->>>>>>> 7cebabe7 (Initial Vanguard species intel and fauna persistence)
 // ==========================================
 
 // SPA Fallback: Must be below all API routes

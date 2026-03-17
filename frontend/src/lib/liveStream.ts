@@ -35,6 +35,77 @@ export function addAlert(alert: AlertEvent) {
     listeners.forEach(l => l(sharedAlerts));
 }
 
+// Safe timestamp — never returns "Invalid Date"
+function formatTimestamp(raw: any): string {
+    try {
+        const now = new Date();
+        if (!raw) return now.toLocaleTimeString();
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return now.toLocaleTimeString();
+        const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `${date} · ${time}`;
+    } catch {
+        return new Date().toLocaleTimeString();
+    }
+}
+
+function mapServerEventToAlert(data: any, park: any): AlertEvent | null {
+    const payload = data.payload;
+    if (!payload) return null;
+
+    let type: string;
+    let priority: string;
+
+    switch (data.type) {
+        case 'ACOUSTIC_ALERT':
+            type = 'ACOUSTIC';
+            priority = payload.confidence >= 0.92 ? 'CRITICAL' : 'HIGH';
+            break;
+        case 'CAMERA_ALERT':
+            type = 'CAMERA';
+            priority = 'HIGH';
+            break;
+        case 'COMMUNITY_ALERT':
+            type = 'COMMUNITY';
+            priority = 'ELEVATED';
+            break;
+        case 'CORRELATED_INCIDENT':
+            type = 'CORRELATED';
+            priority = payload.priority || 'CRITICAL';
+            break;
+        case 'ONE_HEALTH_FLAG':
+            type = 'ONE_HEALTH';
+            priority = 'HIGH';
+            break;
+        case 'NEW_ALERT':
+            type = payload.type || 'ACOUSTIC';
+            priority = payload.priority || 'HIGH';
+            break;
+        default:
+            return null;
+    }
+
+    const zone = payload.zone || 'Z1';
+    const zonePolygon = park?.zones?.[zone];
+    const location = zonePolygon
+        ? getRandomPointInZone(zonePolygon)
+        : park?.centerCoordinates || [0, 0];
+
+    return {
+        id: payload.id || `EVT-${Date.now()}`,
+        parkId: payload.parkId,
+        type,
+        subType: payload.subType || payload.type || type,
+        zone,
+        location,
+        confidence: payload.confidence ?? null,
+        description: payload.description || payload.message || '',
+        timestamp: formatTimestamp(payload.timestamp),
+        priority,
+    };
+}
+
 export function useLiveAlerts(parkId?: string | null) {
     const [alerts, setAlerts] = useState<AlertEvent[]>([]);
     const [predictiveState, setPredictiveState] = useState<PredictiveState | null>(null);
@@ -45,55 +116,76 @@ export function useLiveAlerts(parkId?: string | null) {
             setAlerts([]);
             return;
         }
-        
+
         if (currentParkId !== parkId) {
             currentParkId = parkId;
             const park = PARKS.find(p => p.id === parkId);
             sharedAlerts = park ? [...park.mockAlerts] : [];
-            
-            if (eventSource) {
-                eventSource.close();
-            }
-            
+
+            if (eventSource) eventSource.close();
+
             eventSource = new EventSource('/api/events');
+
             eventSource.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if (data.type === 'NEW_ALERT' && park) {
-                    const newAlert = data.payload;
-                    const zonePolygon = park.zones[newAlert.zone];
-                    if (zonePolygon) {
-                        newAlert.location = getRandomPointInZone(zonePolygon);
-                    } else {
-                        newAlert.location = park.centerCoordinates;
+                try {
+                    const data = JSON.parse(event.data);
+                    const currentPark = PARKS.find(p => p.id === currentParkId);
+
+                    // Full system clear
+                    if (data.type === 'SYSTEM_CLEAR' || data.type === 'CLEAR_FEED') {
+                        sharedAlerts = [];
+                        listeners.forEach(l => l(sharedAlerts));
+                        return;
                     }
-                    addAlert(newAlert);
-                } else if (data.type === 'CLEAR_FEED') {
-                    sharedAlerts = [];
-                    listeners.forEach(l => l(sharedAlerts));
-                } else if (data.type === 'SYSTEM_STATE') {
-                    if (data.payload.feature === 'PREDICTIVE_THREAT') {
+
+                    // Selective purge — remove specific IDs from shared state
+                    if (data.type === 'SELECTIVE_PURGE') {
+                        const removedIds = new Set(data.payload?.ids || []);
+                        sharedAlerts = sharedAlerts.filter(a => !removedIds.has(a.id));
+                        listeners.forEach(l => l(sharedAlerts));
+                        return;
+                    }
+
+                    if (data.type === 'ENVIRONMENT_UPDATE') {
+                        sharedEnvironmentData = data.payload;
+                        environmentListeners.forEach(l => l(sharedEnvironmentData));
+                        return;
+                    }
+
+                    if (data.type === 'SYSTEM_STATE' && data.payload?.feature === 'PREDICTIVE_THREAT') {
                         sharedPredictiveState = data.payload.data;
                         predictiveListeners.forEach(l => l(sharedPredictiveState));
+                        return;
                     }
-                } else if (data.type === 'ENVIRONMENT_UPDATE') {
-                    sharedEnvironmentData = data.payload;
-                    environmentListeners.forEach(l => l(sharedEnvironmentData));
+
+                    const eventParkId = data.payload?.parkId;
+                    if (eventParkId && eventParkId !== currentParkId) return;
+
+                    const alert = mapServerEventToAlert(data, currentPark);
+                    if (alert) addAlert(alert);
+
+                } catch (err) {
+                    console.warn('[liveStream] Failed to parse SSE event:', err);
                 }
+            };
+
+            eventSource.onerror = () => {
+                console.warn('[liveStream] SSE connection error — backend may be offline.');
             };
         }
 
         setAlerts([...sharedAlerts]);
         setPredictiveState(sharedPredictiveState);
         setEnvironmentData(sharedEnvironmentData);
-        
+
         const listener = (newAlerts: AlertEvent[]) => setAlerts([...newAlerts]);
         const predListener = (newState: PredictiveState | null) => setPredictiveState(newState);
         const envListener = (newData: EnvironmentData | null) => setEnvironmentData(newData);
-        
+
         listeners.push(listener);
         predictiveListeners.push(predListener);
         environmentListeners.push(envListener);
-        
+
         return () => {
             listeners = listeners.filter(l => l !== listener);
             predictiveListeners = predictiveListeners.filter(l => l !== predListener);
