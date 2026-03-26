@@ -15,7 +15,15 @@ let eeReady = false;
 let eeTileUrl = '';
 
 try {
-    const eeKey = require('../earth-engine-491414-a2f63906e133.json');
+    // Support both: env var (Render/production) and local file (dev)
+    let eeKey;
+    if (process.env.GEE_SERVICE_ACCOUNT_KEY) {
+        eeKey = JSON.parse(process.env.GEE_SERVICE_ACCOUNT_KEY);
+        console.log('[EarthEngine] Using credentials from environment variable.');
+    } else {
+        eeKey = require('../earth-engine-491414-a2f63906e133.json');
+        console.log('[EarthEngine] Using credentials from local JSON file.');
+    }
     console.log('[EarthEngine] Authenticating with private key...');
     ee.data.authenticateViaPrivateKey(eeKey, () => {
         ee.initialize(null, null, () => {
