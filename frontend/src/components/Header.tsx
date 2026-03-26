@@ -7,7 +7,6 @@ interface HeaderProps {
     onBack?: () => void;
     parkId?: string | null;
     onSpeciesIntel?: () => void;
-    // onCameraFeeds and onSoundAnalysis removed — now navigate to pages internally
 }
 
 const Header: React.FC<HeaderProps> = ({ onBack, parkId, onSpeciesIntel }) => {
@@ -19,63 +18,78 @@ const Header: React.FC<HeaderProps> = ({ onBack, parkId, onSpeciesIntel }) => {
         return () => clearInterval(timer);
     }, []);
 
+    const parkDisplay = parkId ? parkId.replace(/-/g, ' ').toUpperCase() : 'NAGARHOLE';
+
     return (
-        <header className="h-14 bg-black border-b border-vanguard-border flex items-center justify-between px-6 shrink-0 z-50">
-            {/* Left: Logo and Back */}
-            <div className="flex items-center gap-4">
-                {onBack && (
-                    <button
-                        onClick={onBack}
-                        className="flex items-center gap-1.5 text-[10px] font-mono tracking-widest text-vanguard-species hover:text-white transition-colors bg-vanguard-species/10 px-2 py-1 rounded"
-                    >
-                        <ArrowLeft className="w-3 h-3" /> CHANGE PARK
-                    </button>
-                )}
-                <div className="flex items-center gap-3">
-                    <Shield className="text-vanguard-zoneClear w-6 h-6" />
-                    <h1 className="text-xl font-bold tracking-widest text-white uppercase flex items-baseline">
-                        Vanguard
-                    </h1>
+        <header className="h-16 shrink-0 z-50 relative"
+            style={{ background: 'linear-gradient(180deg,#050810 0%,#0A0F1A 100%)', borderBottom: '1px solid #1F2937' }}>
+
+            {/* Scan line */}
+            <div className="absolute bottom-0 left-0 right-0 h-px"
+                style={{ background: 'linear-gradient(90deg,transparent 0%,rgba(16,185,129,0.5) 35%,rgba(16,185,129,0.5) 65%,transparent 100%)' }} />
+
+            {/* 3-column grid — center never overlaps left or right */}
+            <div className="h-full grid items-center px-4 gap-2"
+                style={{ gridTemplateColumns: '1fr auto 1fr' }}>
+
+                {/* LEFT */}
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                    {onBack && (
+                        <button onClick={onBack}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono tracking-widest text-vanguard-species hover:text-white bg-vanguard-species/10 hover:bg-vanguard-species/20 border border-vanguard-species/25 rounded transition-all shrink-0">
+                            <ArrowLeft className="w-3 h-3 shrink-0" />
+                            CHANGE PARK
+                        </button>
+                    )}
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Shield className="text-vanguard-zoneClear w-5 h-5 shrink-0" />
+                        <span className="text-base font-syne font-bold tracking-[0.18em] text-white uppercase truncate">
+                            VANGUARD
+                        </span>
+                    </div>
                 </div>
-            </div>
 
-            {/* Center: Park name */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center pointer-events-none">
-                <h2 className="text-[13px] font-bold tracking-[0.2em] text-gray-200 uppercase">
-                    {parkId ? parkId.replace('-', ' ') : 'NAGARHOLE'} NATIONAL PARK
-                </h2>
-                <span className="text-[10px] text-vanguard-camera font-mono bg-vanguard-camera/10 px-2 py-0.5 rounded mt-1 border border-vanguard-camera/20">
-                    PROTECTED AREA
-                </span>
-            </div>
+                {/* CENTER */}
+                <div className="flex flex-col items-center justify-center shrink-0 px-4">
+                    <h2 className="text-[13px] font-syne font-bold tracking-[0.22em] text-gray-100 uppercase whitespace-nowrap">
+                        {parkDisplay} NATIONAL PARK
+                    </h2>
+                    <span className="text-[9px] text-vanguard-camera font-mono tracking-[0.3em] mt-0.5 opacity-75 whitespace-nowrap">
+                        ◈ PROTECTED AREA
+                    </span>
+                </div>
 
-            {/* Right: Nav buttons + Clock */}
-            <div className="flex items-center gap-4">
-                <button
-                    onClick={() => parkId && navigate(`/park/${parkId}/cameras`)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-vanguard-panel border border-vanguard-border rounded hover:bg-gray-800 transition-colors"
-                >
-                    <Fingerprint className="w-4 h-4 text-vanguard-species" />
-                    CAMERA FEEDS
-                </button>
-                <button
-                    onClick={onSpeciesIntel ?? (() => parkId && navigate(`/park/${parkId}/species`))}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-vanguard-panel border border-vanguard-border rounded hover:bg-gray-800 transition-colors"
-                >
-                    <span className="w-2 h-2 rounded-full bg-vanguard-species animate-pulse" />
-                    SPECIES ID
-                </button>
-                <button
-                    onClick={() => parkId && navigate(`/park/${parkId}/sound`)}
-                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-vanguard-panel border border-vanguard-border rounded hover:bg-gray-800 transition-colors"
-                >
-                    <Activity className="w-4 h-4 text-vanguard-community" />
-                    SOUND ANALYSIS
-                </button>
+                {/* RIGHT */}
+                <div className="flex items-center justify-end gap-3 min-w-0 overflow-hidden pr-2">
+                    <button onClick={() => parkId && navigate(`/park/${parkId}/cameras`)}
+                        title="Camera Feeds"
+                        className="flex items-center gap-2 px-3.5 py-2 text-[11px] font-mono font-bold bg-vanguard-panel border border-vanguard-border rounded hover:border-vanguard-species/50 hover:text-vanguard-species transition-all shrink-0">
+                        <Fingerprint className="w-4 h-4 text-vanguard-species" />
+                        <span className="hidden xl:inline tracking-wider">CAMERA</span>
+                    </button>
+                    <button onClick={onSpeciesIntel ?? (() => parkId && navigate(`/park/${parkId}/species`))}
+                        title="Species ID"
+                        className="flex items-center gap-2 px-3.5 py-2 text-[11px] font-mono font-bold bg-vanguard-panel border border-vanguard-border rounded hover:border-vanguard-species/50 hover:text-vanguard-species transition-all shrink-0">
+                        <span className="w-2 h-2 rounded-full bg-vanguard-species animate-pulse shrink-0" />
+                        <span className="hidden xl:inline tracking-wider">SPECIES</span>
+                    </button>
+                    <button onClick={() => parkId && navigate(`/park/${parkId}/sound`)}
+                        title="Sound Analysis"
+                        className="flex items-center gap-2 px-3.5 py-2 text-[11px] font-mono font-bold bg-vanguard-panel border border-vanguard-border rounded hover:border-vanguard-community/50 hover:text-vanguard-community transition-all shrink-0">
+                        <Activity className="w-4 h-4 text-vanguard-community" />
+                        <span className="hidden xl:inline tracking-wider">SOUND</span>
+                    </button>
 
-                <div className="h-4 w-px bg-vanguard-border mx-2" />
-                <div className="text-sm font-mono text-gray-300 w-48 text-right">
-                    {format(currentTime, 'MMM dd, yyyy | HH:mm:ss')}
+                    <div className="h-6 w-px bg-vanguard-border mx-2 shrink-0" />
+
+                    <div className="shrink-0 text-right whitespace-nowrap flex flex-col justify-center">
+                        <div className="text-xs font-mono text-gray-400 leading-tight">
+                            {format(currentTime, 'dd MMM yyyy')}
+                        </div>
+                        <div className="text-sm font-mono text-vanguard-species font-bold leading-tight">
+                            {format(currentTime, 'HH:mm:ss')}
+                        </div>
+                    </div>
                 </div>
             </div>
         </header>

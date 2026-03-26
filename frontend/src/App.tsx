@@ -12,11 +12,13 @@ import CameraFeedsPage from './CameraFeedsPage';
 import SoundAnalysisPage from './SoundAnalysisPage';
 import CommunityReportModal from './components/CommunityReportModal';
 import RemoteController from './RemoteController';
+import ZoneManager from './components/ZoneManager'; // NEW: 3D Globe component wrapper
 
 const DashboardView = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [communityModalOpen, setCommunityModalOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d'); // NEW: toggle between 2D and 3D
 
     if (!id) return <Navigate to="/" />;
 
@@ -33,7 +35,36 @@ const DashboardView = () => {
 
                 {/* Left Side: Map (60%) */}
                 <div className="w-[60%] h-full border-r border-vanguard-border flex flex-col relative bg-black">
-                    <MapPanel parkId={id} />
+                    {/* View Toggle Buttons */}
+                    <div className="absolute top-4 right-4 z-[1000] flex gap-2">
+                        <button
+                            onClick={() => setViewMode('2d')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                viewMode === '2d' 
+                                    ? 'bg-vanguard-camera text-[#0A0F1A]' 
+                                    : 'bg-black/50 text-white/70 hover:bg-black/70'
+                            }`}
+                        >
+                            2D Map
+                        </button>
+                        <button
+                            onClick={() => setViewMode('3d')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                viewMode === '3d' 
+                                    ? 'bg-vanguard-camera text-[#0A0F1A]' 
+                                    : 'bg-black/50 text-white/70 hover:bg-black/70'
+                            }`}
+                        >
+                            3D Globe
+                        </button>
+                    </div>
+
+                    {/* Conditional Rendering: 2D Map or 3D Globe */}
+                    {viewMode === '2d' ? (
+                        <MapPanel parkId={id} />
+                    ) : (
+                        <ZoneManager parkId={id} />
+                    )}
 
                     {/* Floating Community Report Button on the Map */}
                     <div className="absolute bottom-6 left-6 z-[1000]">

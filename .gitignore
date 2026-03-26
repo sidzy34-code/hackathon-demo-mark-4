@@ -1,6 +1,29 @@
+# Dependencies
 node_modules/
 frontend/node_modules/
+backend/node_modules/
+
+# Build output
 frontend/dist/
 node/
+
+# Environment & secrets
 .env
+.env.local
+.env.production
+earth-engine-*.json
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+
+# AI agent config (not project code)
+.agent/
+.claude/
+.planning/
+
+# Package lock at root (monorepo — locks live in frontend/ and backend/)
+/package-lock.json

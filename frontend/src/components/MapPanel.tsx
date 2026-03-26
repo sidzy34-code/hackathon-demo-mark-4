@@ -63,11 +63,15 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
                 zoom={10}
                 style={{ height: '100%', width: '100%', background: '#0A0F1A' }}
                 zoomControl={false}
+                minZoom={3}
+                maxBounds={[[-90, -180], [90, 180]]}
+                maxBoundsViscosity={1}
             >
                 <MapUpdater center={center} />
 
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    noWrap={true}
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
                 />
 
@@ -142,7 +146,7 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
                 ))}
             </MapContainer>
 
-            <div className="absolute top-4 right-4 z-[400] bg-vanguard-panel/90 border border-vanguard-border backdrop-blur p-2 rounded text-xs flex flex-col gap-2 shadow-xl">
+            <div className="absolute top-14 right-4 z-[400] bg-vanguard-panel/90 border border-vanguard-border backdrop-blur p-2 rounded text-xs flex flex-col gap-2 shadow-xl">
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-vanguard-zoneClear"></div><span>Clear</span></div>
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-vanguard-zoneMonitor"></div><span>Monitoring</span></div>
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-vanguard-zoneActive"></div><span>Active Alert</span></div>

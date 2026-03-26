@@ -1,25 +1,67 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Camera, Wifi, WifiOff, Link, ArrowLeft } from 'lucide-react';
+import { Camera, Wifi, WifiOff, Link, ArrowLeft, ExternalLink } from 'lucide-react';
 import Header from './components/Header';
 import { PARKS } from './lib/parksData';
+
+interface InatPhoto {
+    imageUrl: string;
+    speciesCommonName: string;
+    scientificName: string;
+    observer: string;
+    observationUrl: string;
+}
+
+const BASE_CAMERAS = [
+    { id: 'CAM-01', zoneIdx: 0, status: 'ONLINE',  model: 'TrailGuard AI v2',   threat: 'NONE'     },
+    { id: 'CAM-02', zoneIdx: 1, status: 'ONLINE',  model: 'TrailGuard AI v1',   threat: 'DETECTED' },
+    { id: 'CAM-03', zoneIdx: 2, status: 'OFFLINE', model: 'TrailGuard AI v2',   threat: 'UNKNOWN'  },
+    { id: 'CAM-04', zoneIdx: 3, status: 'ONLINE',  model: 'Standard IP Cam',    threat: 'NONE'     },
+    { id: 'CAM-05', zoneIdx: 4, status: 'ONLINE',  model: 'TrailGuard AI v2',   threat: 'NONE'     },
+    { id: 'CAM-06', zoneIdx: 5, status: 'ONLINE',  model: 'Standard IP Cam',    threat: 'NONE'     },
+    { id: 'CAM-07', zoneIdx: 6, status: 'OFFLINE', model: 'TrailGuard AI v1',   threat: 'UNKNOWN'  },
+    { id: 'CAM-08', zoneIdx: 7, status: 'ONLINE',  model: 'TrailGuard AI v2',   threat: 'NONE'     },
+];
 
 const CameraFeedsPage: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const park = PARKS.find(p => p.id === id);
-    const zones = park ? Object.keys(park.zones) : ['Z1', 'Z2', 'Z3', 'Z4'];
+    const zones = park ? Object.keys(park.zones) : ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7', 'Z8'];
 
-    const cameras = [
-        { id: 'CAM-01', zone: zones[0] || 'Z1', status: 'ONLINE',  model: 'TrailGuard AI v2',   threat: 'NONE',     image: 'https://images.unsplash.com/photo-1610419993549-74d1252119eb?q=80&w=800&auto=format&fit=crop' },
-        { id: 'CAM-02', zone: zones[1] || 'Z2', status: 'ONLINE',  model: 'TrailGuard AI v1',   threat: 'DETECTED', image: 'https://images.unsplash.com/photo-1564750965-0ae4bf597cfa?q=80&w=800&auto=format&fit=crop' },
-        { id: 'CAM-03', zone: zones[2] || 'Z3', status: 'OFFLINE', model: 'TrailGuard AI v2',   threat: 'UNKNOWN',  image: null },
-        { id: 'CAM-04', zone: zones[3] || 'Z4', status: 'ONLINE',  model: 'Standard IP Cam',    threat: 'NONE',     image: 'https://images.unsplash.com/photo-1549479366-cdca7d2d3aee?q=80&w=800&auto=format&fit=crop' },
-        { id: 'CAM-05', zone: zones[4] || 'Z5', status: 'ONLINE',  model: 'TrailGuard AI v2',   threat: 'NONE',     image: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?q=80&w=800&auto=format&fit=crop' },
-        { id: 'CAM-06', zone: zones[5] || 'Z6', status: 'ONLINE',  model: 'Standard IP Cam',    threat: 'NONE',     image: 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?q=80&w=800&auto=format&fit=crop' },
-        { id: 'CAM-07', zone: zones[6] || 'Z7', status: 'OFFLINE', model: 'TrailGuard AI v1',   threat: 'UNKNOWN',  image: null },
-        { id: 'CAM-08', zone: zones[7] || 'Z8', status: 'ONLINE',  model: 'TrailGuard AI v2',   threat: 'NONE',     image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?q=80&w=800&auto=format&fit=crop' },
-    ];
+    const [inatPhotos, setInatPhotos] = useState<InatPhoto[]>([]);
+    const [loadingPhotos, setLoadingPhotos] = useState(false);
+
+    useEffect(() => {
+        if (!id) return;
+        setLoadingPhotos(true);
+        fetch(`/api/inaturalist/${id}`)
+            .then(r => r.ok ? r.json() : [])
+            .then(data => {
+                const photos: InatPhoto[] = (Array.isArray(data) ? data : []).map((obs: {
+                    imageUrl: string;
+                    speciesCommonName: string;
+                    scientificName: string;
+                    observer: string;
+                    observationUrl: string;
+                }) => ({
+                    imageUrl: obs.imageUrl,
+                    speciesCommonName: obs.speciesCommonName,
+                    scientificName: obs.scientificName,
+                    observer: obs.observer,
+                    observationUrl: obs.observationUrl,
+                }));
+                setInatPhotos(photos);
+            })
+            .catch(() => setInatPhotos([]))
+            .finally(() => setLoadingPhotos(false));
+    }, [id]);
+
+    const cameras = BASE_CAMERAS.map((cam, i) => ({
+        ...cam,
+        zone: zones[cam.zoneIdx] || `Z${cam.zoneIdx + 1}`,
+        photo: cam.status === 'ONLINE' ? (inatPhotos[i] || null) : null,
+    }));
 
     const onlineCount = cameras.filter(c => c.status === 'ONLINE').length;
 
@@ -46,8 +88,11 @@ const CameraFeedsPage: React.FC = () => {
                         <div className="w-px h-4 bg-vanguard-border" />
                         <Camera className="w-5 h-5 text-vanguard-species" />
                         <h1 className="text-sm font-syne font-bold tracking-widest text-white uppercase">
-                            Camera Feeds & Webhooks
+                            Camera Feeds &amp; Webhooks
                         </h1>
+                        {loadingPhotos && (
+                            <span className="text-[9px] font-mono text-green-500/60 animate-pulse">SYNCING iNaturalist…</span>
+                        )}
                     </div>
                     <div className="flex items-center gap-4 text-[10px] font-mono">
                         <span className="text-green-400">{onlineCount} ONLINE</span>
@@ -86,13 +131,20 @@ const CameraFeedsPage: React.FC = () => {
 
                                 {/* Viewfinder */}
                                 <div className="h-44 bg-black relative flex items-center justify-center overflow-hidden">
-                                    {cam.image ? (
+                                    {cam.status === 'OFFLINE' ? (
+                                        <div className="flex flex-col items-center gap-2 text-gray-600">
+                                            <WifiOff size={22} />
+                                            <span className="text-[10px] font-mono tracking-widest">NO SIGNAL</span>
+                                        </div>
+                                    ) : cam.photo ? (
                                         <>
                                             <img
-                                                src={cam.image}
-                                                alt="Camera Feed"
-                                                className="w-full h-full object-cover opacity-60 mix-blend-luminosity hover:mix-blend-normal transition-all duration-500"
+                                                src={cam.photo.imageUrl}
+                                                alt={cam.photo.speciesCommonName}
+                                                className="w-full h-full object-cover opacity-70 mix-blend-luminosity hover:mix-blend-normal hover:opacity-90 transition-all duration-500"
+                                                onError={e => { (e.target as HTMLImageElement).style.opacity = '0'; }}
                                             />
+                                            {/* Viewfinder corners */}
                                             <div className="absolute inset-0 pointer-events-none">
                                                 <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-white/30" />
                                                 <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-white/30" />
@@ -104,16 +156,25 @@ const CameraFeedsPage: React.FC = () => {
                                                     THREAT DETECTED
                                                 </div>
                                             )}
-                                            <div className="absolute bottom-2 left-2">
-                                                <span className="text-[8px] font-mono text-white/60 bg-black/50 px-1 rounded backdrop-blur">
-                                                    {new Date().toISOString().replace('T', ' ').substring(0, 19)} UTC
-                                                </span>
+                                            {/* Species name overlay */}
+                                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent px-2 pt-4 pb-1.5">
+                                                <div className="text-[10px] font-syne font-semibold text-white leading-tight truncate">
+                                                    {cam.photo.speciesCommonName}
+                                                </div>
+                                                <div className="text-[8px] font-mono text-gray-400 italic truncate">
+                                                    {cam.photo.scientificName}
+                                                </div>
+                                                <div className="text-[8px] font-mono text-gray-500 truncate">
+                                                    📷 {cam.photo.observer}
+                                                </div>
                                             </div>
                                         </>
+                                    ) : loadingPhotos ? (
+                                        <span className="text-[10px] font-mono text-gray-600 animate-pulse">SYNCING…</span>
                                     ) : (
                                         <div className="flex flex-col items-center gap-2 text-gray-600">
-                                            <WifiOff size={22} />
-                                            <span className="text-[10px] font-mono tracking-widest">NO SIGNAL</span>
+                                            <Camera size={22} />
+                                            <span className="text-[10px] font-mono tracking-widest">AWAITING FEED</span>
                                         </div>
                                     )}
                                 </div>
@@ -124,9 +185,22 @@ const CameraFeedsPage: React.FC = () => {
                                         <span className="text-[9px] text-gray-500 font-mono tracking-widest">MODEL</span>
                                         <span className="text-[10px] text-gray-300">{cam.model}</span>
                                     </div>
-                                    <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-[9px] font-bold font-mono bg-vanguard-species/10 text-vanguard-species border border-vanguard-species/30 rounded hover:bg-vanguard-species hover:text-white transition-colors">
-                                        <Link size={10} /> CONNECT WEBHOOK
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        {cam.photo?.observationUrl && (
+                                            <a
+                                                href={cam.photo.observationUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-1 px-2 py-1 text-[9px] font-mono text-gray-400 border border-vanguard-border/60 rounded hover:text-white hover:border-gray-400 transition-colors"
+                                                title="View on iNaturalist"
+                                            >
+                                                <ExternalLink size={9} /> iNat
+                                            </a>
+                                        )}
+                                        <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-[9px] font-bold font-mono bg-vanguard-species/10 text-vanguard-species border border-vanguard-species/30 rounded hover:bg-vanguard-species hover:text-white transition-colors">
+                                            <Link size={10} /> CONNECT WEBHOOK
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}

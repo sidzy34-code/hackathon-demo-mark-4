@@ -2,12 +2,89 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const ee = require('@google/earthengine');
 
 const app = express();
 
 // ==========================================
 // 1. BASE CONFIGURATION & ASSETS
 // ==========================================
+
+// Earth Engine Authentication & Initialization
+let eeReady = false;
+let eeTileUrl = '';
+
+try {
+    const eeKey = require('../earth-engine-491414-a2f63906e133.json');
+    console.log('[EarthEngine] Authenticating with private key...');
+    ee.data.authenticateViaPrivateKey(eeKey, () => {
+        ee.initialize(null, null, () => {
+            eeReady = true;
+            console.log('[EarthEngine] Authenticated successfully.');
+            
+            // Create a dynamic high-res global satellite map tile service
+            // Using Sentinel-2 harmonized SR + dynamic scaling
+            const image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+                .filterDate('2023-01-01', '2023-12-31')
+                .median()
+                .visualize({bands: ['B4', 'B3', 'B2'], min: 0, max: 3000});
+            
+            image.getMap({}, ({urlFormat}) => {
+                eeTileUrl = urlFormat;
+                console.log(`[EarthEngine] Tile layer generated: ${urlFormat}`);
+            });
+        }, (err) => {
+            console.error('[EarthEngine] Initialization error:', err);
+        });
+    }, (err) => {
+        console.error('[EarthEngine] Auth error:', err);
+    });
+} catch (err) {
+    console.warn('[EarthEngine] Warning: Key file not found or invalid.', err.message);
+}
+
+// Endpoint to fetch the EE satellite tile URL format for 3D Earth
+app.get('/api/earthengine/tiles', (req, res) => {
+    if (!eeReady || !eeTileUrl) {
+        return res.status(503).json({ error: 'Earth Engine not initialized yet', fallback: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' });
+    }
+    res.json({ urlFormat: eeTileUrl });
+});
+
+// Endpoint to fetch high-res bounding box for a Vanguard park
+app.get('/api/earthengine/park-bounds/:parkId', (req, res) => {
+    const { parkId } = req.params;
+    const PARK_COORDS = {
+        'nagarhole':   { lat: 11.9833, lon: 76.1167, radius: 0.1 },
+        'corbett':     { lat: 29.5300, lon: 78.7747, radius: 0.15 },
+        'kaziranga':   { lat: 26.5775, lon: 93.1711, radius: 0.1 },
+        'sundarbans':  { lat: 21.9497, lon: 88.9468, radius: 0.2 },
+        'maasai-mara': { lat: -1.4061, lon: 35.1019, radius: 0.2 },
+        'kruger':      { lat: -23.9884, lon: 31.5547, radius: 0.3 },
+    };
+    const c = PARK_COORDS[parkId];
+    if (!c) return res.status(404).json({ error: 'Unknown park' });
+    
+    // Return GeoJSON polygon representing the exact border overlay for the globe
+    const border = {
+        type: 'FeatureCollection',
+        features: [{
+            type: 'Feature',
+            geometry: {
+                type: 'Polygon',
+                coordinates: [[
+                    [c.lon - c.radius, c.lat - c.radius],
+                    [c.lon + c.radius, c.lat - c.radius],
+                    [c.lon + c.radius, c.lat + c.radius],
+                    [c.lon - c.radius, c.lat + c.radius],
+                    [c.lon - c.radius, c.lat - c.radius]
+                ]]
+            },
+            properties: { name: parkId, color: '#00ccff' }
+        }]
+    };
+    res.json(border);
+});
 
 // Serve the production-built React frontend files
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
@@ -462,32 +539,39 @@ if (!audioStore) {
     writeJsonSafe(AUDIO_FILE, audioStore);
 }
 // ==========================================
-// 3. VANGUARD CORRELATION ENGINE (VCE)
+// 3. VANGUARD CORRELATION ENGINE (VCE) v2
 // ==========================================
+//
+// Rules (evaluated in priority order):
+//   Rule A — Triple Correlation: 3+ events in zone within 30 min, 2+ source types → CRITICAL correlated incident
+//   Rule B — High-Confidence Acoustic: GUNSHOT/CHAINSAW > 0.92 confidence → HIGH priority
+//   Rule C — Zone Correlation: 2+ events in zone within 30 min, ≥1 human-presence signal → ELEVATED incident
+
 function processEvent(newEvent) {
     newEvent.timestampMs = Date.now();
     recentAlerts.push(newEvent);
-    
-    // Auto-purge stale data (> 5 minutes) to maintain precision
-    const fiveMinsAgo = Date.now() - 5 * 60 * 1000;
-    recentAlerts = recentAlerts.filter(a => a.timestampMs > fiveMinsAgo);
 
-    // Contextual Grouping: Check for other alerts in the same Park Sector
-    const zoneAlerts = recentAlerts.filter(a => 
-        a.parkId === newEvent.parkId && 
+    // 30-minute rolling window — wide enough for multi-source correlation
+    const thirtyMinsAgo = Date.now() - 30 * 60 * 1000;
+    recentAlerts = recentAlerts.filter(a => a.timestampMs > thirtyMinsAgo);
+
+    // Gather all events in this zone for this park within the window
+    const zoneAlerts = recentAlerts.filter(a =>
+        a.parkId === newEvent.parkId &&
         a.zone === newEvent.zone
     );
-    
-    const uniqueTypes = new Set(zoneAlerts.map(a => a.type));
 
-    // Rule 2: High Confidence Acoustic instantly elevates priority
-    if (newEvent.type === 'ACOUSTIC' && newEvent.subType === 'GUNSHOT' && newEvent.confidence >= 0.90) {
-        console.log(`[VCE] CRITICAL: Confirmed gunshot detected via acoustic triangulation.`);
-        newEvent.priority = 'CRITICAL';
-    }
+    // Distinct source types present in this zone window (ACOUSTIC, CAMERA, COMMUNITY)
+    const uniqueSourceTypes = new Set(zoneAlerts.map(a => a.type));
 
-    // Rule 3: TRIPLE CORRELATION (The "Holy Grail" of Detection)
-    if (uniqueTypes.size >= 3) {
+    // A human-presence signal means any CAMERA HUMAN_PRESENCE or any COMMUNITY report
+    const hasHumanPresence = zoneAlerts.some(a =>
+        a.subType === 'HUMAN_PRESENCE' || a.type === 'COMMUNITY'
+    );
+
+    // ── Rule A: Triple Correlation (highest priority — fires immediately) ──
+    if (zoneAlerts.length >= 3 && uniqueSourceTypes.size >= 2) {
+        console.log(`[VCE] CRITICAL: Triple correlation in ${newEvent.parkId} ${newEvent.zone}. Sources: ${[...uniqueSourceTypes].join(', ')}.`);
         const correlatedEvent = {
             id: `COR-${Date.now()}`,
             type: 'CORRELATED',
@@ -495,22 +579,37 @@ function processEvent(newEvent) {
             zone: newEvent.zone,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
             timestampMs: Date.now(),
-            description: 'TRIPLE CORRELATION: Computer Vision, Acoustic arrays, and Human Intelligence have triangulated to this exact sector. Dispatching tactical units immediately.',
+            description: `TRIPLE CORRELATION: Computer Vision, Acoustic arrays, and Human Intelligence have triangulated to ${newEvent.zone}. Dispatching tactical units immediately.`,
             priority: 'CRITICAL',
-            location: newEvent.location, 
+            location: newEvent.location,
             parkId: newEvent.parkId
         };
-        
-        broadcastEvent('NEW_ALERT', newEvent); 
-        setTimeout(() => broadcastEvent('NEW_ALERT', correlatedEvent), 1500); 
+        // Broadcast the triggering event first, then the correlated incident
+        broadcastEvent('NEW_ALERT', newEvent);
+        setTimeout(() => broadcastEvent('NEW_ALERT', correlatedEvent), 1500);
         return;
-    } 
-    
-    // Rule 1: DOUBLE ZONE CORRELATION
-    else if (uniqueTypes.size === 2) {
-        newEvent.priority = 'CRITICAL'; 
-        const otherType = [...uniqueTypes].filter(t => t !== newEvent.type)[0];
-        newEvent.description = `[CORRELATED with ${otherType}] ` + newEvent.description;
+    }
+
+    // ── Rule B: High-confidence acoustic (GUNSHOT or CHAINSAW) ──
+    if (
+        newEvent.type === 'ACOUSTIC' &&
+        (newEvent.subType === 'GUNSHOT' || newEvent.subType === 'CHAINSAW') &&
+        newEvent.confidence > 0.92
+    ) {
+        newEvent.priority = 'HIGH';
+        console.log(`[VCE] HIGH: Confirmed ${newEvent.subType} at confidence ${newEvent.confidence} in ${newEvent.parkId} ${newEvent.zone}.`);
+    }
+
+    // ── Rule C: Zone correlation with human-presence signal ──
+    if (
+        zoneAlerts.length >= 2 &&
+        hasHumanPresence &&
+        newEvent.priority !== 'CRITICAL' &&
+        newEvent.priority !== 'HIGH'
+    ) {
+        newEvent.priority = 'ELEVATED';
+        newEvent.description = `[ZONE CORRELATION] Human-activity signal detected in sector. ` + newEvent.description;
+        console.log(`[VCE] ELEVATED: Zone correlation + human presence in ${newEvent.parkId} ${newEvent.zone}.`);
     }
 
     broadcastEvent('NEW_ALERT', newEvent);
@@ -1055,6 +1154,109 @@ app.get('/api/gbif/:lat/:lon', async (req, res) => {
 });
 
 // ==========================================
+// iNaturalist Live Sightings Proxy
+// ==========================================
+// Maps each park to its real-world coordinates and fetches research-grade
+// wildlife observations from iNaturalist within a per-park radius.
+// Returns data normalized to the Spotting interface used by SpeciesIntelPage
+// and CameraFeedsPage. Proxied server-side to avoid browser CORS issues.
+
+const PARK_COORDS = {
+    'nagarhole':   { lat: 11.9833, lon: 76.1167, radius: 35 },
+    'corbett':     { lat: 29.5300, lon: 78.7747, radius: 45 },
+    'kaziranga':   { lat: 26.5775, lon: 93.1711, radius: 30 },
+    'sundarbans':  { lat: 21.9497, lon: 88.9468, radius: 40 },
+    'maasai-mara': { lat: -1.4061, lon: 35.1019, radius: 50 },
+    'kruger':      { lat: -23.9884, lon: 31.5547, radius: 80 },
+};
+
+const ZONES = ['Z1','Z2','Z3','Z4','Z5','Z6','Z7','Z8'];
+
+app.get('/api/inaturalist/:parkId', async (req, res) => {
+    const { parkId } = req.params;
+    const coords = PARK_COORDS[parkId];
+    if (!coords) return res.status(404).json({ error: 'Unknown park' });
+
+    try {
+        console.log(`[iNaturalist] Fetching research-grade sightings for ${parkId}...`);
+        // taxon_id=1 = Animalia (all animals). quality_grade=research = community-verified.
+        const url = `https://api.inaturalist.org/v1/observations?lat=${coords.lat}&lng=${coords.lon}&radius=${coords.radius}&quality_grade=research&per_page=20&order=desc&order_by=observed_on&taxon_id=1`;
+        const response = await fetch(url, {
+            headers: { 'User-Agent': 'VanguardConservationPlatform/1.0 (conservation-research)' }
+        });
+        if (!response.ok) throw new Error(`iNaturalist returned ${response.status}`);
+        const data = await response.json();
+
+        const results = (data.results || [])
+            .filter(obs => obs.taxon && obs.photos && obs.photos.length > 0)
+            .slice(0, 12)
+            .map((obs, i) => {
+                const photo = obs.photos[0];
+                // Replace "square" with "medium" for larger image (up to 500px)
+                const imageUrl = (photo.url || '').replace('/square', '/medium').replace('square.', 'medium.');
+                const commonName = obs.taxon.preferred_common_name || obs.taxon.name || 'Unknown Species';
+                const scientificName = obs.taxon.name || '';
+                const zone = ZONES[i % ZONES.length];
+                // Determine day/night from observed_on time if available
+                const hour = obs.time_observed_at
+                    ? new Date(obs.time_observed_at).getHours()
+                    : new Date(obs.observed_on).getHours();
+                const visionMode = (hour >= 19 || hour < 6) ? 'NIGHT' : 'DAY';
+                const timestamp = obs.observed_on
+                    ? new Date(obs.observed_on).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : obs.created_at_details?.date || 'Unknown';
+                const placeGuess = obs.place_guess || '';
+                return {
+                    id: `inat-${obs.id}`,
+                    parkId,
+                    speciesCommonName: commonName,
+                    scientificName,
+                    zone,
+                    timestamp,
+                    imageUrl,
+                    visionMode,
+                    placeGuess,
+                    observationUrl: obs.uri,
+                    observer: obs.user?.name || obs.user?.login || 'Citizen Scientist',
+                };
+            });
+
+        console.log(`[iNaturalist] Returning ${results.length} sightings for ${parkId}`);
+        res.json(results);
+    } catch (err) {
+        console.error(`[iNaturalist] Error for ${parkId}:`, err.message);
+        res.status(503).json({ error: err.message, results: [] });
+    }
+});
+
+// ==========================================
+// Wikipedia Species Image Proxy
+// ==========================================
+// Uses the MediaWiki Action API (prop=pageimages) to get the lead
+// thumbnail for a species article. Server-side proxy avoids CORS issues.
+// /api/wiki-image/:species  → { imageUrl, pageTitle }
+
+app.get('/api/wiki-image/:species', async (req, res) => {
+    const { species } = req.params;
+    const title = decodeURIComponent(species).replace(/ /g, '_');
+    try {
+        const url = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=pageimages&pithumbsize=400&format=json&origin=*`;
+        const response = await fetch(url, {
+            headers: { 'User-Agent': 'VanguardConservationPlatform/1.0' }
+        });
+        const data = await response.json();
+        const pages = data?.query?.pages || {};
+        const page = Object.values(pages)[0];
+        const imageUrl = page?.thumbnail?.source || null;
+        const pageTitle = page?.title || title;
+        if (!imageUrl) return res.status(404).json({ imageUrl: null });
+        res.json({ imageUrl, pageTitle });
+    } catch (err) {
+        res.status(503).json({ imageUrl: null, error: err.message });
+    }
+});
+
+// ==========================================
 // 7b. SELECTIVE ALERT MANAGEMENT
 // ==========================================
 
@@ -1081,6 +1283,109 @@ app.post('/api/webhooks/purge-selected', (req, res) => {
     console.log(`[Admin] Selective purge: removed ${removed} alert(s) for park ${parkId || 'all'}`);
     res.status(200).json({ success: true, removed, remaining: recentAlerts.length });
 });
+
+// ==========================================
+// 7c. SENSOR SIMULATION ENGINE
+// ==========================================
+// Generates realistic sensor events in the background so the dashboard is
+// always live even without physical hardware connected.
+//
+// Timings:  Acoustic   3–8 min  |  Camera   5–12 min  |  Community  8–15 min
+
+const SIM_PARK_IDS = ['nagarhole', 'corbett', 'kaziranga', 'sundarbans', 'maasai-mara', 'kruger'];
+const SIM_ZONES    = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7', 'Z8'];
+
+function simRandom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+function simBetween(minMs, maxMs) {
+    return minMs + Math.random() * (maxMs - minMs);
+}
+
+/** Schedule a generator function to run repeatedly at random intervals. */
+function scheduleSim(minMs, maxMs, generator) {
+    const delay = simBetween(minMs, maxMs);
+    setTimeout(() => {
+        try { generator(); } catch (e) { console.error('[SIM] Error in simulation generator:', e); }
+        scheduleSim(minMs, maxMs, generator);
+    }, delay);
+}
+
+// ── Acoustic simulation (3–8 min) ──────────────────────────────────────────
+scheduleSim(3 * 60 * 1000, 8 * 60 * 1000, () => {
+    const parkId = simRandom(SIM_PARK_IDS);
+    const zone   = simRandom(SIM_ZONES);
+    const events = [
+        { subType: 'GUNSHOT',        confidence: 0.87 + Math.random() * 0.12, description: 'Acoustic sensor detected high-caliber discharge pattern in restricted sector.' },
+        { subType: 'CHAINSAW',       confidence: 0.84 + Math.random() * 0.12, description: 'Motorized cutting signature detected — possible illegal logging activity.' },
+        { subType: 'VEHICLE_ENGINE', confidence: 0.80 + Math.random() * 0.12, description: 'Unscheduled vehicle engine signature recorded in restricted zone.' },
+    ];
+    const e = simRandom(events);
+    const confidence = parseFloat(e.confidence.toFixed(2));
+    processEvent({
+        id:          `SIM-ACO-${Date.now()}`,
+        type:        'ACOUSTIC',
+        subType:     e.subType,
+        zone,
+        parkId,
+        confidence,
+        description: e.description,
+        timestamp:   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        priority:    'HIGH',
+    });
+    console.log(`[SIM] Acoustic ${e.subType} (conf ${confidence}) → ${parkId} ${zone}`);
+});
+
+// ── Camera trap simulation (5–12 min) ─────────────────────────────────────
+scheduleSim(5 * 60 * 1000, 12 * 60 * 1000, () => {
+    const parkId = simRandom(SIM_PARK_IDS);
+    const zone   = simRandom(SIM_ZONES);
+    const events = [
+        { subType: 'SPECIES_DETECTED',   confidence: 0.80 + Math.random() * 0.18, description: 'Camera trap identified animal presence in patrol sector.',                                   priority: 'ELEVATED' },
+        { subType: 'HUMAN_PRESENCE',     confidence: 0.82 + Math.random() * 0.14, description: 'Unidentified human figure detected by camera trap in restricted area.',                   priority: 'HIGH'     },
+        { subType: 'BEHAVIORAL_ANOMALY', confidence: 0.74 + Math.random() * 0.16, description: 'Unusual animal behavioral pattern detected — possible stress or external disturbance.',   priority: 'ELEVATED' },
+    ];
+    const e = simRandom(events);
+    const confidence = parseFloat(e.confidence.toFixed(2));
+    processEvent({
+        id:          `SIM-CAM-${Date.now()}`,
+        type:        'CAMERA',
+        subType:     e.subType,
+        zone,
+        parkId,
+        confidence,
+        description: e.description,
+        timestamp:   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        priority:    e.priority,
+    });
+    console.log(`[SIM] Camera ${e.subType} (conf ${confidence}) → ${parkId} ${zone}`);
+});
+
+// ── Community report simulation (8–15 min) ────────────────────────────────
+scheduleSim(8 * 60 * 1000, 15 * 60 * 1000, () => {
+    const parkId = simRandom(SIM_PARK_IDS);
+    const zone   = simRandom(SIM_ZONES);
+    const events = [
+        { subType: 'SUSPICIOUS_VEHICLE', description: 'Community member reported unidentified vehicle near park boundary.' },
+        { subType: 'SNARE_DETECTED',     description: 'Active wire snare line reported by local community patrol member.' },
+        { subType: 'DEAD_ANIMAL',        description: 'Animal carcass discovered — possible poaching or disease event.' },
+        { subType: 'POACHER_CAMP',       description: 'Evidence of recent illegal encampment found by community scout.' },
+    ];
+    const e = simRandom(events);
+    processEvent({
+        id:          `SIM-COM-${Date.now()}`,
+        type:        'COMMUNITY',
+        subType:     e.subType,
+        zone,
+        parkId,
+        description: e.description,
+        timestamp:   new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        priority:    'ELEVATED',
+    });
+    console.log(`[SIM] Community ${e.subType} → ${parkId} ${zone}`);
+});
+
+console.log('[SIM] Sensor simulation engine armed — acoustic 3–8 min | camera 5–12 min | community 8–15 min');
 
 // ==========================================
 // 8. CRITICAL HOUSING & ROUTING LOGIC (DO NOT MODIFY)

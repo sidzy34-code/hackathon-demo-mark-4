@@ -24,6 +24,9 @@ interface Spotting {
     timestamp: string;
     imageUrl: string;
     visionMode: 'NIGHT' | 'DAY';
+    placeGuess?: string;
+    observer?: string;
+    observationUrl?: string;
 }
 
 interface VisionResult {
@@ -48,6 +51,8 @@ const SpeciesIntelPage: React.FC = () => {
     const [loadingFauna, setLoadingFauna] = useState(false);
     const [loadingSpottings, setLoadingSpottings] = useState(false);
     const [savingFauna, setSavingFauna] = useState(false);
+    // Wiki thumbnail cache: scientificName → imageUrl
+    const [wikiImages, setWikiImages] = useState<Record<string, string>>({});
 
     const [editingEntry, setEditingEntry] = useState<FaunaEntry | null>(null);
     const [isNewEntry, setIsNewEntry] = useState(false);
@@ -63,15 +68,36 @@ const SpeciesIntelPage: React.FC = () => {
         setLoadingFauna(true);
         fetch(`/api/fauna/${id}`)
             .then(r => r.json())
-            .then(data => setFauna(data || []))
+            .then((data: FaunaEntry[]) => {
+                setFauna(data || []);
+                // Fetch Wikipedia thumbnails for every species in the catalog
+                (data || []).forEach(entry => {
+                    if (!entry.scientificName) return;
+                    fetch(`/api/wiki-image/${encodeURIComponent(entry.scientificName)}`)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(img => {
+                            if (img?.imageUrl) {
+                                setWikiImages(prev => ({ ...prev, [entry.scientificName]: img.imageUrl }));
+                            }
+                        })
+                        .catch(() => {});
+                });
+            })
             .catch(() => setFauna([]))
             .finally(() => setLoadingFauna(false));
 
+        // Use iNaturalist for real research-grade sightings; fall back to seeded store
         setLoadingSpottings(true);
-        fetch(`/api/spottings/${id}`)
-            .then(r => r.json())
-            .then(data => setSpottings(data || []))
-            .catch(() => setSpottings([]))
+        fetch(`/api/inaturalist/${id}`)
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then((data: Spotting[]) => setSpottings(Array.isArray(data) ? data : []))
+            .catch(() =>
+                // Fallback: seeded spottings store
+                fetch(`/api/spottings/${id}`)
+                    .then(r => r.json())
+                    .then(data => setSpottings(data || []))
+                    .catch(() => setSpottings([]))
+            )
             .finally(() => setLoadingSpottings(false));
     }, [id]);
 
@@ -249,9 +275,12 @@ const SpeciesIntelPage: React.FC = () => {
                         <div className="flex items-center justify-between px-4 py-3 border-b border-vanguard-border bg-black/40">
                             <div className="flex items-center gap-2">
                                 <Clock className="w-4 h-4 text-vanguard-camera" />
-                                <span className="text-[10px] font-mono tracking-widest text-gray-400 uppercase">
-                                    24h CAMERA SPOTTINGS
-                                </span>
+                                <div>
+                                    <span className="text-[10px] font-mono tracking-widest text-gray-400 uppercase">
+                                        RECENT WILDLIFE SIGHTINGS
+                                    </span>
+                                    <span className="ml-2 text-[9px] font-mono text-green-500/70">iNaturalist LIVE</span>
+                                </div>
                             </div>
                             <input
                                 className="hidden md:block bg-black/60 border border-vanguard-border rounded px-2 py-1 text-[10px] font-mono text-gray-200 outline-none focus:border-vanguard-species w-40"
@@ -287,10 +316,11 @@ const SpeciesIntelPage: React.FC = () => {
                                             src={spot.imageUrl}
                                             alt={spot.speciesCommonName}
                                             className="w-full h-full object-cover opacity-80"
+                                            onError={e => { (e.target as HTMLImageElement).src = 'https://inaturalist-open-data.s3.amazonaws.com/photos/80678745/medium.jpg'; }}
                                         />
                                         <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1 py-0.5 flex items-center justify-between">
                                             <span className="text-[9px] font-mono text-gray-300">
-                                                {spot.visionMode === 'NIGHT' ? 'NIGHT' : 'DAY'}
+                                                {spot.visionMode === 'NIGHT' ? '🌙 NIGHT' : '☀️ DAY'}
                                             </span>
                                             <span className="text-[9px] font-mono text-gray-400">
                                                 {spot.zone}
@@ -307,11 +337,16 @@ const SpeciesIntelPage: React.FC = () => {
                                                     {spot.scientificName}
                                                 </div>
                                             )}
+                                            {spot.placeGuess && (
+                                                <div className="text-[9px] font-mono text-gray-500 truncate">
+                                                    📍 {spot.placeGuess}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex items-center justify-between text-[10px] font-mono text-gray-400">
                                             <div className="flex items-center gap-1">
                                                 <MapPin className="w-3 h-3 text-vanguard-species" />
-                                                <span>{spot.zone}</span>
+                                                <span>{spot.observer || 'Citizen Scientist'}</span>
                                             </div>
                                             <span>{spot.timestamp}</span>
                                         </div>
@@ -368,12 +403,22 @@ const SpeciesIntelPage: React.FC = () => {
                                 .map(entry => (
                                 <div key={entry.id} className="p-3 flex flex-col gap-1 hover:bg-black/40 transition-colors">
                                     <div className="flex items-center justify-between">
-                                        <div>
-                                            <div className="text-xs font-syne font-semibold text-white">
-                                                {entry.commonName}
-                                            </div>
-                                            <div className="text-[10px] font-mono text-gray-400 italic">
-                                                {entry.scientificName}
+                                        <div className="flex items-center gap-3">
+                                            {wikiImages[entry.scientificName] && (
+                                                <img
+                                                    src={wikiImages[entry.scientificName]}
+                                                    alt={entry.commonName}
+                                                    className="w-12 h-12 rounded object-cover border border-vanguard-border/60 shrink-0"
+                                                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                />
+                                            )}
+                                            <div>
+                                                <div className="text-xs font-syne font-semibold text-white">
+                                                    {entry.commonName}
+                                                </div>
+                                                <div className="text-[10px] font-mono text-gray-400 italic">
+                                                    {entry.scientificName}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
