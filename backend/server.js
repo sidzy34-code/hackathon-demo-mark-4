@@ -3,8 +3,46 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const ee = require('@google/earthengine');
+const mongoose = require('mongoose');
 
 const app = express();
+
+// ==========================================
+// 0. MONGODB CONNECTION
+// ==========================================
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://vanguard-admin:itsmesid@vanguard.f6u5i4v.mongodb.net/vanguard';
+
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log('[MongoDB] Connected to Atlas cluster.'))
+    .catch(err => console.error('[MongoDB] Connection error:', err.message));
+
+// Zone Schema
+const zoneSchema = new mongoose.Schema({
+    parkId:    { type: String, required: true, index: true },
+    name:      { type: String, required: true },
+    latitude:  { type: Number, required: true },
+    longitude: { type: Number, required: true },
+    radius:    { type: Number, required: true },
+    status:    { type: String, enum: ['critical', 'warning', 'normal'], default: 'normal' },
+    alerts:    { type: Number, default: 0 },
+    createdAt: { type: Date, default: Date.now },
+});
+const Zone = mongoose.model('Zone', zoneSchema);
+
+// Default zones to seed if DB is empty for a park
+const DEFAULT_ZONES = {
+    nagarhole:   [
+        { name: 'Alpha Core',  latitude: 11.9833 + 0.05, longitude: 76.1167 - 0.05, radius: 5000, status: 'critical', alerts: 2 },
+        { name: 'Beta Sector', latitude: 11.9833 - 0.03, longitude: 76.1167 + 0.02, radius: 6000, status: 'warning',  alerts: 1 },
+        { name: 'Gamma Ring',  latitude: 11.9833 + 0.02, longitude: 76.1167 + 0.06, radius: 5500, status: 'normal',   alerts: 0 },
+        { name: 'Delta Post',  latitude: 11.9833 - 0.04, longitude: 76.1167 - 0.03, radius: 7000, status: 'critical', alerts: 3 },
+    ],
+    corbett:     [{ name: 'Core Zone', latitude: 29.53, longitude: 78.7747, radius: 8000, status: 'normal', alerts: 0 }],
+    kaziranga:   [{ name: 'Rhino Reserve', latitude: 26.5775, longitude: 93.1711, radius: 7000, status: 'warning', alerts: 1 }],
+    sundarbans:  [{ name: 'Tiger Delta', latitude: 21.9497, longitude: 88.9468, radius: 9000, status: 'critical', alerts: 2 }],
+    'maasai-mara': [{ name: 'Migration Corridor', latitude: -1.4061, longitude: 35.1019, radius: 10000, status: 'normal', alerts: 0 }],
+    kruger:      [{ name: 'Big Five Zone', latitude: -23.9884, longitude: 31.5547, radius: 12000, status: 'warning', alerts: 1 }],
+};
 
 // ==========================================
 // 1. BASE CONFIGURATION & ASSETS
@@ -92,6 +130,58 @@ app.get('/api/earthengine/park-bounds/:parkId', (req, res) => {
         }]
     };
     res.json(border);
+});
+
+// ==========================================
+// ZONES API — MongoDB backed
+// ==========================================
+
+// GET /api/zones/:parkId — fetch all zones; auto-seed if empty
+app.get('/api/zones/:parkId', async (req, res) => {
+    try {
+        const { parkId } = req.params;
+        let zones = await Zone.find({ parkId });
+        if (zones.length === 0 && DEFAULT_ZONES[parkId]) {
+            const seeds = DEFAULT_ZONES[parkId].map(z => ({ ...z, parkId }));
+            zones = await Zone.insertMany(seeds);
+            console.log(`[MongoDB] Seeded ${zones.length} zones for ${parkId}`);
+        }
+        res.json(zones);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/zones — create a new zone
+app.post('/api/zones', async (req, res) => {
+    try {
+        const zone = new Zone(req.body);
+        await zone.save();
+        res.status(201).json(zone);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// PATCH /api/zones/:id — update zone status/alerts
+app.patch('/api/zones/:id', async (req, res) => {
+    try {
+        const zone = await Zone.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!zone) return res.status(404).json({ error: 'Zone not found' });
+        res.json(zone);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// DELETE /api/zones/:id — remove a zone
+app.delete('/api/zones/:id', async (req, res) => {
+    try {
+        await Zone.findByIdAndDelete(req.params.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
 });
 
 // Serve the production-built React frontend files
