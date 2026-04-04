@@ -32,11 +32,68 @@ const MapUpdater = ({ center }: { center: [number, number] }) => {
     return null;
 };
 
-interface MapPanelProps {
-    parkId?: string | null;
+interface EstateBoundaryData {
+    name: string;
+    boundary: { type: string; coordinates: [number, number][][] } | null;
+    centroid_lat: number | null;
+    centroid_lon: number | null;
 }
 
-const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
+interface MapPanelProps {
+    parkId?: string | null;
+    estateBoundary?: EstateBoundaryData | null;
+}
+
+const MapPanel: React.FC<MapPanelProps> = ({ parkId, estateBoundary }) => {
+    // ── Estate mode: show estate boundary ──────────────────────────────────
+    if (estateBoundary) {
+        const lat = estateBoundary.centroid_lat ?? 20;
+        const lon = estateBoundary.centroid_lon ?? 78;
+        const center: [number, number] = [lat, lon];
+
+        // Convert GeoJSON [lon, lat] → Leaflet [lat, lon]
+        const positions: [number, number][] =
+            estateBoundary.boundary?.coordinates[0]
+                ?.map(([lng, lt]) => [lt, lng] as [number, number]) ?? [];
+
+        return (
+            <div className="w-full h-full relative" id="map-container">
+                <MapContainer
+                    center={center}
+                    zoom={13}
+                    style={{ height: '100%', width: '100%', background: '#0A0F1A' }}
+                    zoomControl={false}
+                    minZoom={3}
+                >
+                    <MapUpdater center={center} />
+                    <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        noWrap={true}
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        className="dark-osm-tiles"
+                    />
+                    {positions.length >= 3 && (
+                        <Polygon
+                            positions={positions}
+                            pathOptions={{
+                                color: '#00ffcc',
+                                fillColor: '#00ffcc',
+                                fillOpacity: 0.12,
+                                weight: 2,
+                            }}
+                        />
+                    )}
+                </MapContainer>
+                <div className="absolute top-4 left-4 z-[400] px-3 py-1.5 bg-vanguard-panel/90 border border-vanguard-border backdrop-blur rounded">
+                    <span className="font-mono text-[10px] text-vanguard-species/80 tracking-widest uppercase">
+                        {estateBoundary.name}
+                    </span>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Park mode: existing logic ──────────────────────────────────────────
     const park = PARKS.find(p => p.id === parkId) || PARKS[0];
     const { alerts, predictiveState } = useLiveAlerts(parkId || PARKS[0].id);
 
@@ -70,9 +127,10 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId }) => {
                 <MapUpdater center={center} />
 
                 <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     noWrap={true}
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    className="dark-osm-tiles"
                 />
 
                 {Object.entries(zones).map(([zoneId, coords]) => {

@@ -5,6 +5,7 @@ import { useLiveAlerts } from '../lib/liveStream';
 
 interface AlertFeedProps {
     parkId?: string | null;
+    isEstate?: boolean;
 }
 
 const getIcon = (type: string) => {
@@ -27,17 +28,37 @@ const getPriorityColor = (priority: string) => {
     }
 };
 
-const AlertFeed: React.FC<AlertFeedProps> = ({ parkId }) => {
+const AlertFeed: React.FC<AlertFeedProps> = ({ parkId, isEstate }) => {
+    // For park mode: require a matching park; for estate mode: show alerts regardless
     const park = PARKS.find(p => p.id === parkId);
-    const { alerts } = useLiveAlerts(parkId);
-    if (!park) return null;
+
+    // Always try to get a valid ID for live alerts — use first park as fallback for estates
+    const liveId = (park?.id) || PARKS[0].id;
+    const { alerts } = useLiveAlerts(liveId);
+
+    // For park routes that don't match: return nothing (original behavior)
+    if (!isEstate && !park) return null;
 
     return (
         <div className="h-full flex flex-col pt-2">
             <div className="px-5 pb-3 pt-1 border-b border-vanguard-border flex justify-between items-center bg-vanguard-panel">
-                <h2 className="font-syne font-semibold tracking-wide text-sm text-gray-200">LIVE FEED</h2>
-                <span className="text-xs font-mono text-vanguard-zoneActive bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 mr-2 flex items-center gap-1.5"><div className="w-1.5 h-1.5 rounded-full animate-pulse bg-red-500" />{alerts.length} Active System Flags</span>
+                <h2 className="font-syne font-semibold tracking-wide text-sm text-gray-200">
+                    {isEstate ? 'ESTATE INTEL FEED' : 'LIVE FEED'}
+                </h2>
+                <span className="text-xs font-mono text-vanguard-zoneActive bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20 mr-2 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full animate-pulse bg-red-500" />
+                    {alerts.length} Active System Flags
+                </span>
             </div>
+
+            {isEstate && alerts.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-center px-6">
+                    <ShieldAlert size={28} className="text-vanguard-species/30" />
+                    <p className="font-mono text-[10px] text-white/20 tracking-widest leading-relaxed uppercase">
+                        No active alerts<br />Estate perimeter nominal
+                    </p>
+                </div>
+            )}
 
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 custom-scrollbar">
                 {alerts.map(alert => (

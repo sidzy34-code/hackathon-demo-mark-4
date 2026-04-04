@@ -9,6 +9,10 @@
 }
 
 /* Custom scrollbar for alert feed */
+.dark-osm-tiles {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(110%);
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -81,4 +85,44 @@
 .cesium-credit-logoContainer,
 .cesium-credit-expand-link {
   display: none !important;
+}
+
+/* Leaflet Draw — Dark Theme */
+.leaflet-draw-toolbar a {
+  background-color: #111827 !important;
+  border: 1px solid #1F2937 !important;
+  color: #fff !important;
+}
+
+.leaflet-draw-toolbar a:hover {
+  background-color: #1F2937 !important;
+  border-color: #10B981 !important;
+}
+
+.leaflet-draw-actions {
+  background-color: #111827 !important;
+  border: 1px solid #1F2937 !important;
+}
+
+.leaflet-draw-actions a {
+  color: #e5e7eb !important;
+  background-color: #111827 !important;
+  border-bottom: 1px solid #1F2937 !important;
+}
+
+.leaflet-draw-actions a:hover {
+  background-color: #1F2937 !important;
+  color: #10B981 !important;
+}
+
+.leaflet-draw-tooltip {
+  background-color: #111827 !important;
+  border: 1px solid #1F2937 !important;
+  color: #9ca3af !important;
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-size: 10px !important;
+}
+
+.leaflet-draw-tooltip-single {
+  margin-top: -10px !important;
 }

@@ -12,15 +12,13 @@ import {
   createWorldTerrainAsync,
   GeoJsonDataSource,
   ClassificationType,
+  PolygonHierarchy,
+  ShadowMode,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 
-// Set Ion token at module level — enables World Imagery + World Terrain
-Ion.defaultAccessToken =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ODU4OGE1YS00NTA2LTRmY2ItOWRmNS1hYTIyMTA5NGNkMjkiLCJpZCI6NDA5OTY1LCJpYXQiOjE3NzQ2MDAzMTd9.6KdayOutxoeStY5iTKrSzDtKy5JzUM2tt4B4hv5O68M';
+Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_TOKEN || '';
 
-// Max parallel tile requests per server — Cesium default is 6, raise to 18
-// This is the single biggest lever for reducing tile pop-in delay
 RequestScheduler.maximumRequestsPerServer = 18;
 
 interface Zone {
@@ -37,11 +35,19 @@ export interface GlobeRef {
   flyTo: (lat: number, lon: number) => void;
 }
 
+interface EstateBoundaryData {
+  name: string;
+  boundary: { type: string; coordinates: [number, number][][] } | null;
+  centroid_lat: number | null;
+  centroid_lon: number | null;
+}
+
 interface GlobeViewerProps {
   parkId: string;
   zones?: Zone[];
   alerts?: any[];
   onZoneClick?: (zone: Zone) => void;
+  estateBoundary?: EstateBoundaryData | null;
 }
 
 const PARK_COORDS: Record<string, { lat: number; lon: number; alt: number }> = {
@@ -59,18 +65,21 @@ const ZONE_COLORS: Record<string, { fill: string; outline: string }> = {
   normal:   { fill: 'rgba(51,204,255,0.12)',  outline: '#33ccff' },
 };
 
+// Pitch limits — prevents flipping upside down in any direction
+const MIN_PITCH = CesiumMath.toRadians(-89.9); // never quite straight down (avoids gimbal)
+const MAX_PITCH = CesiumMath.toRadians(-5);    // never look up above horizon
+
 export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
-  ({ parkId, zones = [] }, ref) => {
+  ({ parkId, zones = [], estateBoundary }, ref) => {
+    const isEstate = !!estateBoundary;
     const containerRef = useRef<HTMLDivElement>(null);
     const viewerRef    = useRef<Viewer | null>(null);
     const parkIdRef    = useRef(parkId);
     const zonesRef     = useRef(zones);
 
-    // Keep refs in sync for use inside effects
     parkIdRef.current = parkId;
     zonesRef.current  = zones;
 
-    // Expose flyTo to parent
     useImperativeHandle(ref, () => ({
       flyTo: (lat: number, lon: number) => {
         const v = viewerRef.current;
@@ -87,7 +96,6 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
       },
     }));
 
-    // ─── Mount Cesium Viewer once ─────────────────────────────────────────────
     useEffect(() => {
       if (!containerRef.current || viewerRef.current) return;
 
@@ -104,21 +112,81 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
         selectionIndicator:    false,
       });
 
+      // ── PERFORMANCE OPTIMIZATIONS ──────────────────────────────────────────
+      // Request render mode stops rendering when camera is still -> HUGE CPU savings
+      viewer.scene.requestRenderMode = true;
+      viewer.scene.maximumRenderTimeChange = Infinity;
+
+      // Drop anti-aliasing (FXAA) since modern high-DPI screens don't need it much
+      viewer.scene.postProcessStages.fxaa.enabled = false;
+      viewer.resolutionScale = 0.9; // Cheap 10% boost with virtually invisible quality drop
+
+      // Aggressive tile loading for "instantaneous" panning -> reduces white box flashing
+      const globe = viewer.scene.globe;
+      globe.maximumScreenSpaceError = 2.5; // Slightly blockier tiles load MUCH faster initially
+      globe.tileCacheSize = 1000;
+      globe.preloadAncestors = true;
+      globe.preloadSiblings = true;
+      globe.enableLighting = false; // Disable sun lighting computations
+
+      // Strip unnecessary celestial bodies
+      if (viewer.scene.sun) viewer.scene.sun.show = false;
+      if (viewer.scene.moon) viewer.scene.moon.show = false;
+      if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false;
+      if (viewer.scene.fog) viewer.scene.fog.enabled = false;
+
       viewerRef.current = viewer;
 
-      // Google Earth-identical camera physics
-      const MAX_ZOOM_OUT = 20_000_000; // 20,000km hard ceiling
+      const MAX_ZOOM_OUT = 20_000_000;
       const ctrl = viewer.scene.screenSpaceCameraController;
-      ctrl.inertiaSpin            = 0.93;  // long drag coast on release
-      ctrl.inertiaTranslate       = 0.93;  // pan coast
-      ctrl.inertiaZoom            = 0.8;   // snappy zoom deceleration
-      ctrl.minimumZoomDistance    = 100;
-      ctrl.maximumZoomDistance    = MAX_ZOOM_OUT;
-      ctrl.enableCollisionDetection = false;
-      ctrl.maximumMovementRatio   = 0.025; // ~4x less spin per pixel
 
-      // Inertia zoom: accumulate velocity from wheel, decay with damping
-      // This gives Google Earth's "coasting" feel after a fast scroll
+      ctrl.inertiaSpin             = 0.93;
+      ctrl.inertiaTranslate        = 0.93;
+      ctrl.inertiaZoom             = 0.8;
+      ctrl.minimumZoomDistance     = 300;        // never closer than 300m above ground
+      ctrl.maximumZoomDistance     = MAX_ZOOM_OUT;
+      ctrl.enableCollisionDetection = true;      // FIX: prevents camera going inside globe
+      ctrl.maximumMovementRatio    = 0.02;
+
+      // ── Pitch clamp on every frame — the core fix for flipping ──────────
+      // Runs after each render frame and corrects pitch if it drifted out of range
+      const pitchClampHandler = viewer.scene.preRender.addEventListener(() => {
+        const cam = viewer.camera;
+        const pitch = cam.pitch;
+
+        if (pitch > MAX_PITCH) {
+          // Camera looking too far up — clamp down
+          cam.setView({
+            orientation: {
+              heading: cam.heading,
+              pitch: MAX_PITCH,
+              roll: 0,
+            },
+          });
+        } else if (pitch < MIN_PITCH) {
+          // Camera went past straight down — clamp back
+          cam.setView({
+            orientation: {
+              heading: cam.heading,
+              pitch: MIN_PITCH,
+              roll: 0,
+            },
+          });
+        }
+
+        // Also clamp roll to zero — prevents Dutch roll / tilt during fast spins
+        if (Math.abs(cam.roll) > CesiumMath.toRadians(0.5)) {
+          cam.setView({
+            orientation: {
+              heading: cam.heading,
+              pitch: cam.pitch,
+              roll: 0,
+            },
+          });
+        }
+      });
+
+      // ── Custom inertia wheel zoom ────────────────────────────────────────
       let zoomVelocity = 0;
       let zoomRafId: number | null = null;
 
@@ -132,25 +200,29 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
         const height = v.camera.positionCartographic?.height ?? 1_000_000;
         const zoomAmount = height * 0.05 * Math.abs(zoomVelocity);
         if (zoomVelocity > 0) {
-          v.camera.zoomIn(zoomAmount);
+          // Zoom in — respect minimum zoom
+          if (height > ctrl.minimumZoomDistance + zoomAmount) {
+            v.camera.zoomIn(zoomAmount);
+          }
         } else {
           if (height < MAX_ZOOM_OUT) v.camera.zoomOut(zoomAmount);
         }
-        zoomVelocity *= 0.82; // damping — higher = longer coast
+        zoomVelocity *= 0.82;
         zoomRafId = requestAnimationFrame(animateZoom);
       };
 
-      // Custom wheel: accumulate velocity then animate with inertia
-      ctrl.zoomEventTypes = [CameraEventType.PINCH]; // keep pinch-zoom, disable default wheel
+      // Disable default wheel zoom — use custom handler instead
+      ctrl.zoomEventTypes = [CameraEventType.PINCH];
+
       viewer.screenSpaceEventHandler.setInputAction((wheelDelta: number) => {
         const v = viewerRef.current;
         if (!v || v.isDestroyed()) return;
         const height = v.camera.positionCartographic?.height ?? 1_000_000;
-        // Block zoom-out when at max distance
         if (wheelDelta < 0 && height >= MAX_ZOOM_OUT) return;
-        // Convert wheel delta to velocity units (normalise browser differences)
+        // Hard block: prevent zooming closer than minimum distance
+        if (wheelDelta > 0 && height <= ctrl.minimumZoomDistance + 50) return;
         zoomVelocity += Math.sign(wheelDelta) * Math.min(Math.abs(wheelDelta) / 100, 4);
-        zoomVelocity = Math.max(-12, Math.min(12, zoomVelocity)); // clamp max speed
+        zoomVelocity = Math.max(-8, Math.min(8, zoomVelocity)); // tighter clamp = more control
         if (!zoomRafId) zoomRafId = requestAnimationFrame(animateZoom);
       }, ScreenSpaceEventType.WHEEL);
 
@@ -159,62 +231,68 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
         ScreenSpaceEventType.LEFT_DOUBLE_CLICK
       );
 
-      // Uniform lighting — entire Earth lit equally, no day/night terminator
-      viewer.scene.globe.enableLighting = false;
-      if (viewer.scene.sun) viewer.scene.sun.show = false;
-      if (viewer.scene.moon) viewer.scene.moon.show = false;
-      if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = true;
 
-      // ── Tile streaming performance (target <80ms pop-in) ──────────────────
-      const globe = viewer.scene.globe;
-      globe.maximumScreenSpaceError = 1.5;
-      globe.tileCacheSize            = 1000;
-      globe.preloadAncestors         = true;
-      globe.preloadSiblings          = true;
-      globe.loadingDescendantLimit   = 20;
-      // ──────────────────────────────────────────────────────────────────────
 
-      // Load Cesium World Terrain (real 3D elevation)
       createWorldTerrainAsync({ requestWaterMask: true, requestVertexNormals: true })
         .then(provider => {
           if (!viewer.isDestroyed()) viewer.terrainProvider = provider;
         })
-        .catch(() => {/* fallback to ellipsoid if token ran out */});
+        .catch(() => {});
 
-      // Force Cesium canvas to fill the container correctly
       viewer.resize();
 
-      // ResizeObserver — keeps canvas sized to parent on window/layout changes
       const resizeObserver = new ResizeObserver(() => {
         if (!viewer.isDestroyed()) viewer.resize();
       });
       if (containerRef.current) resizeObserver.observe(containerRef.current);
 
-      // Fly to the initial park — full globe view, park facing screen
-      const c = PARK_COORDS[parkIdRef.current] || PARK_COORDS['nagarhole'];
-      setTimeout(() => {
-        if (!viewer.isDestroyed()) {
-          viewer.camera.flyTo({
-            destination: Cartesian3.fromDegrees(c.lon, c.lat, c.alt),
-            orientation: {
-              heading: CesiumMath.toRadians(0),
-              pitch:   CesiumMath.toRadians(-90), // straight down — globe faces you
-              roll: 0,
-            },
-            duration: 2.5,
-          });
+      // For estate mode: fly to the estate centroid/close-up zoom
+      // For park mode: fly to the known park coordinates
+      const initFly = () => {
+        if (isEstate && estateBoundary) {
+          const lat = estateBoundary.centroid_lat ?? 20;
+          const lon = estateBoundary.centroid_lon ?? 78;
+          setTimeout(() => {
+            if (!viewer.isDestroyed()) {
+              viewer.camera.flyTo({
+                destination: Cartesian3.fromDegrees(lon, lat, 25_000),
+                orientation: {
+                  heading: CesiumMath.toRadians(0),
+                  pitch: CesiumMath.toRadians(-55),
+                  roll: 0,
+                },
+                duration: 2,
+              });
+            }
+          }, 600);
+        } else {
+          const c = PARK_COORDS[parkIdRef.current] || PARK_COORDS['nagarhole'];
+          setTimeout(() => {
+            if (!viewer.isDestroyed()) {
+              viewer.camera.flyTo({
+                destination: Cartesian3.fromDegrees(c.lon, c.lat, c.alt),
+                orientation: {
+                  heading: CesiumMath.toRadians(0),
+                  pitch:   CesiumMath.toRadians(-90),
+                  roll: 0,
+                },
+                duration: 2.5,
+              });
+            }
+          }, 600);
         }
-      }, 600);
+      };
+      initFly();
 
-      // Cleanup
       return () => {
+        pitchClampHandler();   // remove preRender listener
         resizeObserver.disconnect();
+        if (zoomRafId) cancelAnimationFrame(zoomRafId);
         if (!viewer.isDestroyed()) viewer.destroy();
         viewerRef.current = null;
       };
-    }, []); // Only runs once — Viewer is an imperative singleton
+    }, []);
 
-    // ─── Fly to park when parkId changes ─────────────────────────────────────
     useEffect(() => {
       const viewer = viewerRef.current;
       if (!viewer || viewer.isDestroyed()) return;
@@ -235,7 +313,6 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
       }, 200);
     }, [parkId]);
 
-    // ─── Sync zone entities whenever zones prop changes ───────────────────────
     useEffect(() => {
       const viewer = viewerRef.current;
       if (!viewer || viewer.isDestroyed()) return;
@@ -261,11 +338,66 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
       });
     }, [zones]);
 
-    // ─── Load park boundary GeoJSON ───────────────────────────────────────────
+    // ── Estate mode: render the estate polygon ────────────────────────────
     useEffect(() => {
       const viewer = viewerRef.current;
       if (!viewer || viewer.isDestroyed()) return;
 
+      if (isEstate && estateBoundary?.boundary?.coordinates[0]) {
+        viewer.entities.removeAll();
+        viewer.dataSources.removeAll();
+
+        const coords = estateBoundary.boundary.coordinates[0];
+        const positions = coords.map(([lon, lat]) => Cartesian3.fromDegrees(lon, lat));
+
+        viewer.entities.add({
+          name: estateBoundary.name,
+          polygon: {
+            hierarchy: new PolygonHierarchy(positions),
+            // Extruded height gives the polygon a visible 3D volume above the terrain
+            extrudedHeight: 120,
+            height: 0,
+            perPositionHeight: false,
+            material: Color.fromCssColorString('#00ffcc').withAlpha(0.18),
+            outline: true,
+            outlineColor: Color.fromCssColorString('#00ffcc').withAlpha(0.9),
+            outlineWidth: 3,
+            shadows: ShadowMode.DISABLED,
+            closeTop: true,
+            closeBottom: false,
+          },
+        });
+
+        // Also add a ground-level outline for crisp edge on terrain
+        viewer.entities.add({
+          polyline: {
+            positions: [...positions, positions[0]], // close the ring
+            width: 2.5,
+            material: Color.fromCssColorString('#00ffcc').withAlpha(0.95),
+            clampToGround: true,
+          },
+        });
+
+        // Fly to estate
+        const lat = estateBoundary.centroid_lat ?? 20;
+        const lon = estateBoundary.centroid_lon ?? 78;
+        setTimeout(() => {
+          if (!viewer.isDestroyed()) {
+            viewer.camera.flyTo({
+              destination: Cartesian3.fromDegrees(lon, lat, 25_000),
+              orientation: {
+                heading: CesiumMath.toRadians(0),
+                pitch: CesiumMath.toRadians(-55),
+                roll: 0,
+              },
+              duration: 1.5,
+            });
+          }
+        }, 300);
+        return;
+      }
+
+      // ── Park mode: fetch park-bounds from API ───────────────────────────
       fetch(`/api/earthengine/park-bounds/${parkId}`)
         .then(r => r.json())
         .then(data => {
@@ -283,7 +415,7 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
           }
         })
         .catch(() => {});
-    }, [parkId]);
+    }, [parkId, isEstate, estateBoundary]);
 
     const handleReset = () => {
       const viewer = viewerRef.current;
@@ -302,13 +434,10 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
 
     return (
       <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-        {/* Cesium canvas */}
         <div
           ref={containerRef}
           style={{ width: '100%', height: '100%', background: '#0a0f1a' }}
         />
-
-        {/* Reset view button — top-left overlay */}
         <button
           onClick={handleReset}
           title="Reset view"
@@ -340,7 +469,6 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
             (e.currentTarget as HTMLButtonElement).style.background = 'rgba(10, 15, 26, 0.65)';
           }}
         >
-          {/* Crosshair / home icon */}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(0,255,200,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="2" x2="12" y2="6" />
