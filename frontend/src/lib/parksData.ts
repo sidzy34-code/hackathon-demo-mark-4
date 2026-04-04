@@ -1,7 +1,7 @@
 import { getRandomPointInZone, PARK_SHAPES } from './zoneGenerator';
 
-export type EventType = 'ACOUSTIC' | 'CAMERA' | 'COMMUNITY' | 'CORRELATED' | 'ONE_HEALTH';
-export type PriorityLevel = 'NORMAL' | 'ELEVATED' | 'HIGH' | 'CRITICAL';
+export type EventType = 'ACOUSTIC' | 'CAMERA' | 'COMMUNITY' | 'CORRELATED' | 'ONE_HEALTH' | 'WILDLIFE_CORRELATION';
+export type PriorityLevel = 'NORMAL' | 'ELEVATED' | 'HIGH' | 'CRITICAL' | 'PREDICTIVE';
 
 export interface AlertEvent {
     id: string;

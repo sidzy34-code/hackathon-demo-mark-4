@@ -14,6 +14,7 @@ import SoundAnalysisPage from './SoundAnalysisPage';
 import CommunityReportModal from './components/CommunityReportModal';
 import RemoteController from './RemoteController';
 import ZoneManager from './components/ZoneManager';
+import WildlifeTrackerPanel from './components/WildlifeTrackerPanel';
 import AuthPage from './AuthPage';
 import DashboardPage from './DashboardPage';
 import LoadingScreen from '../LoadingScreen';
@@ -211,6 +212,7 @@ const DashboardView = () => {
                             <div className="flex-1">
                                 <QuickStats parkId={id} />
                             </div>
+                            <WildlifeTrackerPanel />
                         </div>
                     </div>
                 </div>

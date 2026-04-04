@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, Activity, Satellite, Users } from 'lucide-react';
+import { AlertCircle, Activity, Satellite, Users, Brain } from 'lucide-react';
 import { PARKS } from '../lib/parksData';
 import { useLiveAlerts, EnvironmentData } from '../lib/liveStream';
 
@@ -13,6 +13,7 @@ const QuickStats: React.FC<QuickStatsProps> = ({ parkId }) => {
     const [localEnv, setLocalEnv] = useState<EnvironmentData | null>(null);
     const [eonetCount, setEonetCount] = useState<number | null>(null);
     const [gbifCount, setGbifCount] = useState<number | null>(null);
+    const [assessedCount, setAssessedCount] = useState<number | null>(null);
 
     // Fetch environment once on mount if we don't have SSE data yet
     useEffect(() => {
@@ -36,6 +37,17 @@ const QuickStats: React.FC<QuickStatsProps> = ({ parkId }) => {
             .then(data => setGbifCount(data.total))
             .catch(() => {});
     }, [parkId]);
+
+    // Fetch assessed threats count from Supabase
+    useEffect(() => {
+        import('../lib/supabaseClient').then(({ supabase }) => {
+            supabase
+                .from('alerts')
+                .select('id', { count: 'exact', head: true })
+                .not('hypothesis', 'is', null)
+                .then(({ count }) => setAssessedCount(count ?? 0));
+        });
+    }, []);
 
     if (!park) return null;
 
@@ -84,7 +96,18 @@ const QuickStats: React.FC<QuickStatsProps> = ({ parkId }) => {
             icon: Users,
             color: 'text-vanguard-camera',
             border: 'border-vanguard-camera/30',
-            bg: 'bg-vanguard-camera/10'
+            bg: 'bg-vanguard-camera/10',
+            onClick: undefined,
+        },
+        {
+            label: 'ASSESSED THREATS',
+            value: assessedCount !== null ? assessedCount : '—',
+            subtitle: 'AI HYPOTHESIS',
+            icon: Brain,
+            color: 'text-purple-400',
+            border: 'border-purple-500/30',
+            bg: 'bg-purple-500/10',
+            onClick: () => window.dispatchEvent(new CustomEvent('vanguard:filter-assessed')),
         },
     ];
 
@@ -93,7 +116,11 @@ const QuickStats: React.FC<QuickStatsProps> = ({ parkId }) => {
             <h3 className="text-[10px] font-semibold text-gray-500 mb-2 tracking-widest uppercase">Quick Stats</h3>
             <div className="grid grid-cols-2 gap-2 flex-1">
                 {stats.map((stat, idx) => (
-                    <div key={idx} className={`bg-vanguard-panel border ${stat.border} rounded p-2.5 flex flex-col justify-between`}>
+                    <div
+                        key={idx}
+                        onClick={stat.onClick}
+                        className={`bg-vanguard-panel border ${stat.border} rounded p-2.5 flex flex-col justify-between transition-all ${stat.onClick ? 'cursor-pointer hover:brightness-110 hover:-translate-y-0.5' : ''}`}
+                    >
                         <div className="flex items-center justify-between">
                             <span className="text-[9px] font-semibold text-gray-400">{stat.label}</span>
                             <div className={`p-1 rounded ${stat.bg}`}>
