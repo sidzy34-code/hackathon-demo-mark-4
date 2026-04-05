@@ -7,9 +7,10 @@ interface HeaderProps {
     onBack?: () => void;
     parkId?: string | null;
     onSpeciesIntel?: () => void;
+    backLabel?: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ onBack, parkId, onSpeciesIntel }) => {
+const Header: React.FC<HeaderProps> = ({ onBack, parkId, onSpeciesIntel, backLabel = 'CHANGE PARK' }) => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const navigate = useNavigate();
 
@@ -38,7 +39,7 @@ const Header: React.FC<HeaderProps> = ({ onBack, parkId, onSpeciesIntel }) => {
                         <button onClick={onBack}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono tracking-widest text-vanguard-species hover:text-white bg-vanguard-species/10 hover:bg-vanguard-species/20 border border-vanguard-species/25 rounded transition-all shrink-0">
                             <ArrowLeft className="w-3 h-3 shrink-0" />
-                            CHANGE PARK
+                            {backLabel}
                         </button>
                     )}
                     <div className="flex items-center gap-2 min-w-0">

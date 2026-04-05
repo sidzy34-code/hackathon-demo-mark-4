@@ -5,6 +5,7 @@ import { useLiveAlerts, EnvironmentData } from '../lib/liveStream';
 
 interface EnvironmentPanelProps {
     parkId?: string | null;
+    coords?: [number, number] | null; // [lat, lon] override for estate mode
 }
 
 function getMoonEmoji(illumination: number): string {
@@ -30,28 +31,33 @@ function getThreatBg(multiplier: number): string {
     return 'bg-green-500/10 border-green-500/30';
 }
 
-const EnvironmentPanel: React.FC<EnvironmentPanelProps> = ({ parkId }) => {
+const EnvironmentPanel: React.FC<EnvironmentPanelProps> = ({ parkId, coords }) => {
     const park = PARKS.find(p => p.id === parkId);
     const { environmentData: liveEnv } = useLiveAlerts(parkId);
     const [localEnv, setLocalEnv] = useState<EnvironmentData | null>(null);
     const [loading, setLoading] = useState(false);
 
-    // Fetch environment data on mount and when park changes
+    // Determine which coordinates to use: explicit coords override > park center
+    const fetchCoords: [number, number] | null = coords ?? (park ? park.centerCoordinates : null);
+
+    // Fetch environment data on mount and when coords / park changes
     useEffect(() => {
-        if (!park) return;
-        const [lat, lon] = park.centerCoordinates;
+        if (!fetchCoords) return;
+        const [lat, lon] = fetchCoords;
         setLoading(true);
         fetch(`/api/environment/${lat}/${lon}`)
             .then(r => r.json())
             .then(data => setLocalEnv(data))
             .catch(() => setLocalEnv(null))
             .finally(() => setLoading(false));
-    }, [parkId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [parkId, coords?.join(',')]);
 
     // Prefer SSE-pushed data (liveEnv) over locally fetched data
     const env = liveEnv || localEnv;
 
-    if (!park) return null;
+    // For estate mode without a parkId match, we still want to render once coords are available
+    if (!park && !coords) return null;
 
     return (
         <div className="flex flex-col gap-2 p-3 bg-vanguard-panel border border-vanguard-border rounded-lg">

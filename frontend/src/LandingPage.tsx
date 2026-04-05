@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PARKS, Park } from './lib/parksData';
 import { Shield, Github, FileText, Mail, ArrowRight, Radio } from 'lucide-react';
 
@@ -11,13 +12,9 @@ const useAnimatedCounter = (endValue: number, duration: number = 2000, suffix: s
         const animate = (currentTime: number) => {
             if (!startTime) startTime = currentTime;
             const progress = Math.min((currentTime - startTime) / duration, 1);
-            // easeOutExpo
             const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
             setCount(Math.floor(easeProgress * endValue));
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            }
+            if (progress < 1) requestAnimationFrame(animate);
         };
         requestAnimationFrame(animate);
     }, [endValue, duration]);
@@ -25,7 +22,7 @@ const useAnimatedCounter = (endValue: number, duration: number = 2000, suffix: s
     return `${count}${suffix}`;
 };
 
-const NumberCounter = ({ value, suffix, label }: { value: number, suffix?: string, label: string }) => {
+const NumberCounter = ({ value, suffix, label }: { value: number; suffix?: string; label: string }) => {
     const displayValue = useAnimatedCounter(value, 2000, suffix);
     return (
         <div className="flex flex-col items-center">
@@ -36,7 +33,6 @@ const NumberCounter = ({ value, suffix, label }: { value: number, suffix?: strin
 };
 
 const Particles = () => {
-    // Generate random particles
     const particles = Array.from({ length: 40 }).map((_, i) => ({
         id: i,
         left: `${Math.random() * 100}%`,
@@ -58,7 +54,7 @@ const Particles = () => {
                         width: `${p.size}px`,
                         height: `${p.size}px`,
                         animation: `particle-drift ${p.duration}s linear infinite`,
-                        animationDelay: `${p.delay}s`
+                        animationDelay: `${p.delay}s`,
                     }}
                 />
             ))}
@@ -66,11 +62,8 @@ const Particles = () => {
     );
 };
 
-interface LandingPageProps {
-    onSelectPark: (parkId: string) => void;
-}
-
-const LandingPage: React.FC<LandingPageProps> = ({ onSelectPark }) => {
+const LandingPage: React.FC = () => {
+    const navigate = useNavigate();
     const [transitionState, setTransitionState] = useState<'idle' | 'pulsing' | 'loading'>('idle');
     const [selectedPark, setSelectedPark] = useState<Park | null>(null);
 
@@ -83,9 +76,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectPark }) => {
         setTimeout(() => {
             setTransitionState('loading');
             setTimeout(() => {
-                onSelectPark(park.id);
-            }, 1500); // 1.5s loading bar duration
-        }, 200); // pulse duration
+                navigate(`/park/${park.id}`);
+            }, 1500);
+        }, 200);
     };
 
     return (
@@ -106,7 +99,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectPark }) => {
                 {/* Counters */}
                 <div className="flex flex-wrap justify-center gap-12 lg:gap-24 w-full border-y border-white/10 py-10 bg-black/20 backdrop-blur-sm">
                     <NumberCounter value={99} suffix="%" label="Powered by Advanced CV" />
-                    {/* Vertical divider on desktop */}
                     <div className="hidden lg:block w-px bg-white/10"></div>
                     <NumberCounter value={6} label="Protected Areas" />
                     <div className="hidden lg:block w-px bg-white/10"></div>
@@ -126,25 +118,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectPark }) => {
                             className={`group relative h-64 rounded bg-gradient-to-br ${park.gradient} border border-white/5 cursor-pointer overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-2xl flex flex-col justify-between p-5`}
                             style={{
                                 borderColor: selectedPark?.id === park.id && transitionState === 'pulsing' ? park.accentColor : undefined,
-                                boxShadow: selectedPark?.id === park.id && transitionState === 'pulsing' ? `0 0 30px ${park.accentColor}` : undefined
+                                boxShadow: selectedPark?.id === park.id && transitionState === 'pulsing' ? `0 0 30px ${park.accentColor}` : undefined,
                             }}
                         >
                             <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors duration-300"></div>
 
-                            {/* Top Row */}
                             <div className="relative z-10 flex justify-between items-start">
                                 <span className="text-sm tracking-widest text-white/80 flex items-center gap-2">
                                     <span className="text-lg">{park.countryFlag}</span> {park.country.toUpperCase()}
                                 </span>
                             </div>
 
-                            {/* Middle */}
                             <div className="relative z-10 mt-auto mb-4">
                                 <h3 className="text-3xl font-bold font-sans tracking-wide mb-1 transition-transform duration-300 group-hover:translate-x-1">{park.name}</h3>
                                 <p className="text-sm text-white/60 font-sans">{park.ecosystem}</p>
                             </div>
 
-                            {/* Bottom Stats Row */}
                             <div className="relative z-10 grid grid-cols-3 gap-2 border-t border-white/10 pt-4">
                                 <div className="flex flex-col">
                                     <span className="text-[10px] text-white/40 font-mono tracking-wider">AREA (HA)</span>
@@ -167,7 +156,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectPark }) => {
                                 </div>
                             </div>
 
-                            {/* Hover Enter Button */}
                             <div className="absolute bottom-4 right-4 z-20 translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
                                 <div
                                     className="w-10 h-10 rounded-full flex items-center justify-center text-white"
@@ -177,7 +165,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectPark }) => {
                                 </div>
                             </div>
 
-                            {/* Border Hover Effect */}
                             <div className="absolute inset-0 border-2 rounded border-transparent group-hover:border-white/20 transition-colors duration-300 pointer-events-none"></div>
                         </div>
                     ))}
@@ -196,7 +183,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectPark }) => {
                 </div>
                 <div className="flex items-center gap-2">
                     Powered by Azure AI
-                    {/* Mock Azure Badge */}
                     <div className="w-4 h-4 rounded bg-blue-600 flex items-center justify-center ml-1">
                         <span className="text-[8px] text-white font-bold">A</span>
                     </div>
@@ -212,13 +198,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectPark }) => {
                     <div className="text-sm font-mono tracking-widest text-vanguard-species mb-12">
                         INITIALIZING VANGUARD COMMAND CENTER
                     </div>
-
                     <div className="w-64 md:w-96 h-1 bg-white/10 rounded overflow-hidden">
                         <div
                             className="h-full"
                             style={{
                                 backgroundColor: selectedPark.accentColor,
-                                animation: 'load-bar 1.5s ease-in-out forwards'
+                                animation: 'load-bar 1.5s ease-in-out forwards',
                             }}
                         ></div>
                     </div>

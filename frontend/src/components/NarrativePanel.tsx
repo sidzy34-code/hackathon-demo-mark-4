@@ -5,6 +5,8 @@ import { generateNarrative, getCachedNarrative } from '../services/narrativeEngi
 interface NarrativePanelProps {
   alert: AlertEvent;
   recentAlerts: AlertEvent[];
+  userRole?: 'government' | 'private';
+  autoGenerate?: boolean; // caller controls auto-trigger instead of hardcoding CRITICAL
 }
 
 type PanelState = 'idle' | 'generating' | 'complete' | 'error';
@@ -39,7 +41,7 @@ function renderWithTimestamps(text: string): React.ReactNode {
   });
 }
 
-const NarrativePanel: React.FC<NarrativePanelProps> = ({ alert, recentAlerts }) => {
+const NarrativePanel: React.FC<NarrativePanelProps> = ({ alert, recentAlerts, userRole = 'government', autoGenerate }) => {
   const cached = getCachedNarrative(alert.id);
   const [state, setState] = useState<PanelState>(cached ? 'complete' : 'idle');
   const [narrative, setNarrative] = useState<string | null>(cached?.text ?? null);
@@ -54,7 +56,7 @@ const NarrativePanel: React.FC<NarrativePanelProps> = ({ alert, recentAlerts }) 
     setState('generating');
     setError(null);
     try {
-      const text = await generateNarrative(alert, recentAlerts);
+      const text = await generateNarrative(alert, recentAlerts, userRole);
       const at = new Date().toISOString();
       setNarrative(text);
       setGeneratedAt(at);
@@ -66,9 +68,10 @@ const NarrativePanel: React.FC<NarrativePanelProps> = ({ alert, recentAlerts }) 
     }
   }, [alert, recentAlerts]);
 
-  // Auto-trigger for CRITICAL alerts
+  // Auto-trigger: use autoGenerate prop if provided, otherwise default to CRITICAL-only
   useEffect(() => {
-    if (isCritical && !cached) {
+    const shouldAuto = autoGenerate !== undefined ? autoGenerate : isCritical;
+    if (shouldAuto && !cached) {
       runGeneration();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,8 +224,8 @@ const NarrativePanel: React.FC<NarrativePanelProps> = ({ alert, recentAlerts }) 
         )}
 
         {state === 'error' && (
-          <p style={{ marginTop: '14px', color: '#FF4444', fontSize: '13px' }}>
-            Brief generation failed. Tap to retry.
+          <p style={{ marginTop: '14px', color: '#FF4444', fontSize: '12px', lineHeight: 1.5 }}>
+            {error ?? 'Brief generation failed.'} <span style={{ opacity: 0.6 }}>Tap to retry.</span>
           </p>
         )}
 

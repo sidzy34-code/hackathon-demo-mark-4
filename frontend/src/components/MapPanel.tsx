@@ -4,26 +4,38 @@ import L from 'leaflet';
 import { PARKS } from '../lib/parksData';
 import { useLiveAlerts } from '../lib/liveStream';
 
-const createCustomIcon = (color: string, iconHtml: string, isPulse: boolean = false) => {
+// ── Icon factory: uses inline CSS so Tailwind JIT doesn't need to scan these strings ──
+const createCustomIcon = (color: string, svgPath: string, isPulse: boolean = false) => {
+    const pulse = isPulse ? 'animation:pulse 1.4s ease-in-out infinite;' : '';
     return L.divIcon({
-        className: 'custom-div-icon',
-        html: `<div class="w-8 h-8 rounded-full border-2 bg-black flex items-center justify-center ${isPulse ? 'animate-pulse-border' : ''}" style="border-color: ${color}; color: ${color}; box-shadow: ${isPulse ? '0 0 15px ' + color : 'none'};">
-            ${iconHtml}
-           </div>`,
+        className: '',
+        html: `<div style="width:32px;height:32px;border-radius:50%;border:2px solid ${color};background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;color:${color};box-shadow:0 0 ${isPulse ? '12px' : '4px'} ${color}88;${pulse}">${svgPath}</div>`,
         iconSize: [32, 32],
         iconAnchor: [16, 16],
-        popupAnchor: [0, -16],
+        popupAnchor: [0, -20],
     });
 };
 
-const Icons = {
-    ACOUSTIC: createCustomIcon('#EF4444', '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5v14M22 10v4M7 5v14M2 10v4"/></svg>'),
-    CAMERA: createCustomIcon('#F59E0B', '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>'),
-    COMMUNITY: createCustomIcon('#3B82F6', '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'),
-    CORRELATED: createCustomIcon('#DC2626', '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>', true),
-    ONE_HEALTH: createCustomIcon('#8B5CF6', '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>'),
+const ICONS = {
+    ACOUSTIC: createCustomIcon('#EF4444',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5v14M22 10v4M7 5v14M2 10v4"/></svg>'),
+    CAMERA: createCustomIcon('#F59E0B',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>'),
+    COMMUNITY: createCustomIcon('#3B82F6',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'),
+    CORRELATED: createCustomIcon('#DC2626',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>', true),
+    ONE_HEALTH: createCustomIcon('#8B5CF6',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>'),
+    WILDLIFE_CORRELATION: createCustomIcon('#10B981',
+        '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>'),
 };
 
+// Fallback icon for any unrecognised alert type
+const FALLBACK_ICON = createCustomIcon('#6B7280',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>');
+
+// ── Map updater: re-centers map when park changes without remounting ──────────
 const MapUpdater = ({ center }: { center: [number, number] }) => {
     const map = useMap();
     useEffect(() => {
@@ -185,7 +197,7 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId, estateBoundary }) => {
                     <Marker
                         key={alert.id}
                         position={alert.location}
-                        icon={Icons[alert.type as keyof typeof Icons]}
+                        icon={ICONS[alert.type as keyof typeof ICONS] ?? FALLBACK_ICON}
                     >
                         <Popup>
                             <div className="w-64">

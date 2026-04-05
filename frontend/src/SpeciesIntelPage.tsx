@@ -243,6 +243,7 @@ const SpeciesIntelPage: React.FC = () => {
         <div className="h-screen w-screen flex flex-col bg-vanguard-bg text-white overflow-hidden">
             <Header
                 onBack={() => navigate(`/park/${id}`)}
+                backLabel="← BACK"
                 parkId={id}
                 onSpeciesIntel={() => {}}
             />
@@ -260,13 +261,6 @@ const SpeciesIntelPage: React.FC = () => {
                             </div>
                         </div>
                     </div>
-                    <button
-                        onClick={() => navigate(`/park/${id}`)}
-                        className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-mono tracking-widest border border-vanguard-border rounded bg-vanguard-panel hover:bg-gray-900"
-                    >
-                        <ChevronLeft className="w-3 h-3" />
-                        RETURN TO COMMAND CENTER
-                    </button>
                 </div>
 
                 <div className="flex-1 grid grid-cols-1 xl:grid-cols-3 gap-4 p-4 overflow-y-auto custom-scrollbar bg-[#0A0F1A]">

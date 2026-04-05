@@ -10,6 +10,7 @@ import { autoRunHypothesis } from '../services/hypothesisEngine';
 interface AlertFeedProps {
     parkId?: string | null;
     isEstate?: boolean;
+    estateId?: string | null;
 }
 
 const getIcon = (type: string) => {
@@ -43,7 +44,7 @@ function sortAlerts(alerts: AlertEvent[]): AlertEvent[] {
     });
 }
 
-const AlertFeed: React.FC<AlertFeedProps> = ({ parkId, isEstate }) => {
+const AlertFeed: React.FC<AlertFeedProps> = ({ parkId, isEstate, estateId }) => {
     // For park mode: require a matching park; for estate mode: show alerts regardless
     const park = PARKS.find(p => p.id === parkId);
 
@@ -153,6 +154,7 @@ const AlertFeed: React.FC<AlertFeedProps> = ({ parkId, isEstate }) => {
                     alert={selectedAlert}
                     recentAlerts={alerts}
                     onClose={() => setSelectedAlert(null)}
+                    estateId={estateId ?? undefined}
                 />
             )}
         </div>

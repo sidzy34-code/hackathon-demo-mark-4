@@ -17,12 +17,14 @@ import ZoneManager from './components/ZoneManager';
 import WildlifeTrackerPanel from './components/WildlifeTrackerPanel';
 import AuthPage from './AuthPage';
 import DashboardPage from './DashboardPage';
+import LandingPage from './LandingPage';
 import LoadingScreen from '../LoadingScreen';
+import EstateIntelPage from './EstateIntelPage';
 import { supabase } from './lib/supabaseClient';
-// Lazy-loaded — Cesium + leaflet-draw must NOT run at app startup
+
 const CreateEstatePage = lazy(() => import('./CreateEstatePage'));
 
-// ─── Error Boundary (class component — required by React API) ──
+// ─── Error Boundary ───────────────────────────────────────────
 class PageErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -50,22 +52,19 @@ class PageErrorBoundary extends Component<{ children: ReactNode }, { error: stri
   }
 }
 
-// ─── Auth guard: redirects to /auth if not logged in ─────────
+// ─── Auth guard ───────────────────────────────────────────────
 function RequireAuth({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, loading } = useAuth();
-    // Redirect only once loading is done and user is not authenticated
     if (!loading && !isAuthenticated) return <Navigate to="/auth" replace />;
     return (
         <>
-            {/* Children mount while LoadingScreen fades — reveal is seamless */}
             {!loading && isAuthenticated && children}
-            {/* Overlay: appears only if loading takes > 750ms */}
             <LoadingScreen isLoading={loading} />
         </>
     );
 }
 
-// ─── Redirect authenticated users away from /auth ────────────
+// ─── Redirect authenticated users away from /auth ─────────────
 function RedirectIfAuth({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, loading } = useAuth();
     if (!loading && isAuthenticated) return <Navigate to="/dashboard" replace />;
@@ -77,19 +76,17 @@ function RedirectIfAuth({ children }: { children: React.ReactNode }) {
     );
 }
 
-
 const DashboardView = () => {
     const { id } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
+    const { isGovernment } = useAuth();
     const [communityModalOpen, setCommunityModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d');
     const [panelCollapsed, setPanelCollapsed] = useState(false);
 
-    // Detect if this is an estate or park route
     const isEstate = location.pathname.startsWith('/estate/');
 
-    // For estate routes: fetch the boundary from Supabase
     const [estateBoundary, setEstateBoundary] = useState<{
         name: string;
         boundary: { type: string; coordinates: [number, number][][] } | null;
@@ -116,16 +113,17 @@ const DashboardView = () => {
             <Header
                 onBack={() => navigate('/dashboard')}
                 parkId={isEstate ? (estateBoundary?.name ?? 'Estate') : id}
-                onSpeciesIntel={() => navigate(`/park/${id}/species`)}
+                onSpeciesIntel={() => {
+                    if (isEstate) navigate(`/estate/${id}/species`);
+                    else navigate(`/park/${id}/species`);
+                }}
             />
 
             <div className="flex-1 flex flex-row overflow-hidden border-t border-vanguard-border">
-                {/* Left Side: Map — expands when panel is collapsed */}
                 <div
                     className="h-full border-r border-vanguard-border flex flex-col relative bg-black transition-all duration-300"
                     style={{ width: panelCollapsed ? '100%' : '60%' }}
                 >
-                    {/* View Toggle */}
                     <div className="absolute top-4 right-4 z-[1000] flex gap-2">
                         <button
                             onClick={() => setViewMode('2d')}
@@ -150,15 +148,9 @@ const DashboardView = () => {
                     </div>
 
                     {viewMode === '2d' ? (
-                        <MapPanel
-                            parkId={isEstate ? null : id}
-                            estateBoundary={isEstate ? estateBoundary : null}
-                        />
+                        <MapPanel parkId={isEstate ? null : id} estateBoundary={isEstate ? estateBoundary : null} />
                     ) : (
-                        <ZoneManager
-                            parkId={isEstate ? null : id}
-                            estateBoundary={isEstate ? estateBoundary : null}
-                        />
+                        <ZoneManager parkId={isEstate ? null : id} estateBoundary={isEstate ? estateBoundary : null} />
                     )}
 
                     <div className="absolute bottom-6 left-6 z-[1000]">
@@ -171,7 +163,6 @@ const DashboardView = () => {
                         </button>
                     </div>
 
-                    {/* Panel collapse arrow tab — sits on the right edge of the map */}
                     <button
                         onClick={() => setPanelCollapsed(c => !c)}
                         title={panelCollapsed ? 'Expand Panel' : 'Collapse Panel'}
@@ -189,7 +180,6 @@ const DashboardView = () => {
                     </button>
                 </div>
 
-                {/* Right Side: Panels — slides off when collapsed */}
                 <div
                     className="h-full flex flex-col bg-vanguard-bg overflow-y-auto custom-scrollbar transition-all duration-300 overflow-hidden"
                     style={{
@@ -200,7 +190,7 @@ const DashboardView = () => {
                 >
                     <div className="flex flex-col min-h-max min-w-[320px]">
                         <div className="border-b border-vanguard-border">
-                            <AlertFeed parkId={isEstate ? null : id} isEstate={isEstate} />
+                            <AlertFeed parkId={isEstate ? null : id} isEstate={isEstate} estateId={isEstate ? id : undefined} />
                         </div>
                         <div className="border-b border-vanguard-border">
                             <ZoneStatus parkId={id} />
@@ -212,7 +202,7 @@ const DashboardView = () => {
                             <div className="flex-1">
                                 <QuickStats parkId={id} />
                             </div>
-                            <WildlifeTrackerPanel />
+                            {isGovernment && <WildlifeTrackerPanel />}
                         </div>
                     </div>
                 </div>
@@ -229,8 +219,10 @@ function App() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Navigate to="/auth" replace />} />
+                {/* Landing page — public, no auth required */}
+                <Route path="/" element={<LandingPage />} />
+
+                {/* Auth */}
                 <Route path="/auth" element={
                     <RedirectIfAuth><AuthPage /></RedirectIfAuth>
                 } />
@@ -244,6 +236,9 @@ function App() {
                 } />
                 <Route path="/park/:id/species" element={
                     <RequireAuth><SpeciesIntelPage /></RequireAuth>
+                } />
+                <Route path="/estate/:id/species" element={
+                    <RequireAuth><EstateIntelPage /></RequireAuth>
                 } />
                 <Route path="/park/:id/cameras" element={
                     <RequireAuth><CameraFeedsPage /></RequireAuth>

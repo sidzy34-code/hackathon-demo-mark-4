@@ -24,18 +24,20 @@ ALTER TABLE alerts ADD COLUMN IF NOT EXISTS source_type text;
 ALTER TABLE alerts ADD COLUMN IF NOT EXISTS zone_label text;
 
 -- Seed: 10 historical Zone 4 incidents for hypothesis engine training corpus
--- Use zone_label text field so we don't conflict with the UUID FK constraint
-INSERT INTO alerts (zone_label, severity, source_type, description, confidence, created_at, resolved, outcome) VALUES
-  ('zone-4', 'CRITICAL',  'ACOUSTIC',   'Gunshot detected, single discharge, high confidence',         94,  NOW() - INTERVAL '45 days'  + '02:14:00'::time, true, 'confirmed_incident'),
-  ('zone-4', 'CRITICAL',  'ACOUSTIC',   'Gunshot detected, possible poaching activity',                 88,  NOW() - INTERVAL '62 days'  + '01:47:00'::time, true, 'confirmed_incident'),
-  ('zone-4', 'ELEVATED',  'CAMERA',     'Two humanoid silhouettes detected on trail camera 7',          79,  NOW() - INTERVAL '62 days'  + '02:03:00'::time, true, 'confirmed_incident'),
-  ('zone-4', 'ELEVATED',  'COMMUNITY',  'Ranger reported suspicious vehicle near Zone 3 boundary',      65,  NOW() - INTERVAL '78 days'  + '01:22:00'::time, true, 'confirmed_incident'),
-  ('zone-4', 'CRITICAL',  'ACOUSTIC',   'Multiple gunshots, 3 discharges detected',                     97,  NOW() - INTERVAL '91 days'  + '02:51:00'::time, true, 'confirmed_incident'),
-  ('zone-4', 'ELEVATED',  'ACOUSTIC',   'Low RPM diesel engine, Zone 3 perimeter',                      71,  NOW() - INTERVAL '110 days' + '00:58:00'::time, true, 'false_positive'),
-  ('zone-4', 'ELEVATED',  'CAMERA',     'Motion event, possible animal movement',                        55,  NOW() - INTERVAL '120 days' + '02:30:00'::time, true, 'false_positive'),
-  ('zone-4', 'CRITICAL',  'ACOUSTIC',   'Gunshot, single discharge, Zone 4 eastern corridor',           91,  NOW() - INTERVAL '135 days' + '01:15:00'::time, true, 'confirmed_incident'),
-  ('zone-4', 'ELEVATED',  'COMMUNITY',  'Community report: unknown persons near waterhole',              60,  NOW() - INTERVAL '150 days' + '02:45:00'::time, true, 'confirmed_incident'),
-  ('zone-4', 'ELEVATED',  'ACOUSTIC',   'Acoustic anomaly, unclassified, possible vehicle',              48,  NOW() - INTERVAL '160 days' + '01:30:00'::time, true, 'false_positive');
+-- zone_label is a text column (added above) — avoids the UUID FK constraint on zone_id
+-- `type` is NOT NULL so we include it; we use 'ACOUSTIC', 'CAMERA', 'COMMUNITY' to match the check constraint
+INSERT INTO alerts (zone_label, type, severity, source_type, description, confidence, created_at, resolved, outcome) VALUES
+  ('zone-4', 'ACOUSTIC',   'CRITICAL',  'ACOUSTIC',   'Gunshot detected, single discharge, high confidence',         94, NOW() - INTERVAL '45 days',  true, 'confirmed_incident'),
+  ('zone-4', 'ACOUSTIC',   'CRITICAL',  'ACOUSTIC',   'Gunshot detected, possible poaching activity',                88, NOW() - INTERVAL '62 days',  true, 'confirmed_incident'),
+  ('zone-4', 'CAMERA',     'ELEVATED',  'CAMERA',     'Two humanoid silhouettes detected on trail camera 7',         79, NOW() - INTERVAL '63 days',  true, 'confirmed_incident'),
+  ('zone-4', 'COMMUNITY',  'ELEVATED',  'COMMUNITY',  'Ranger reported suspicious vehicle near Zone 3 boundary',     65, NOW() - INTERVAL '78 days',  true, 'confirmed_incident'),
+  ('zone-4', 'ACOUSTIC',   'CRITICAL',  'ACOUSTIC',   'Multiple gunshots, 3 discharges detected',                   97, NOW() - INTERVAL '91 days',  true, 'confirmed_incident'),
+  ('zone-4', 'ACOUSTIC',   'ELEVATED',  'ACOUSTIC',   'Low RPM diesel engine, Zone 3 perimeter',                    71, NOW() - INTERVAL '110 days', true, 'false_positive'),
+  ('zone-4', 'CAMERA',     'ELEVATED',  'CAMERA',     'Motion event, possible animal movement',                     55, NOW() - INTERVAL '120 days', true, 'false_positive'),
+  ('zone-4', 'ACOUSTIC',   'CRITICAL',  'ACOUSTIC',   'Gunshot, single discharge, Zone 4 eastern corridor',         91, NOW() - INTERVAL '135 days', true, 'confirmed_incident'),
+  ('zone-4', 'COMMUNITY',  'ELEVATED',  'COMMUNITY',  'Community report: unknown persons near waterhole',           60, NOW() - INTERVAL '150 days', true, 'confirmed_incident'),
+  ('zone-4', 'ACOUSTIC',   'ELEVATED',  'ACOUSTIC',   'Acoustic anomaly, unclassified, possible vehicle',           48, NOW() - INTERVAL '160 days', true, 'false_positive');
+
 
 -- ─── BRIEF 3: Ecology-Crime Interface ────────────────────────
 

@@ -2,12 +2,15 @@
 node_modules/
 frontend/node_modules/
 backend/node_modules/
+node/
 
 # ─── Build output ────────────────────────────────────────────────────────────
 frontend/dist/
 backend/dist/
 dist/
 build/
+output.txt
+*.out
 
 # ─── Vite cache ──────────────────────────────────────────────────────────────
 frontend/.vite/
@@ -22,6 +25,7 @@ frontend/.vite/
 earth-engine-*.json
 service-account-*.json
 *-credentials.json
+*.json.key
 
 # ─── Logs ────────────────────────────────────────────────────────────────────
 *.log

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Activity, Play, Pause, AlertTriangle, Volume2, MapPin, Clock, ArrowLeft } from 'lucide-react';
+import { Activity, Play, Pause, AlertTriangle, Volume2, MapPin, Clock } from 'lucide-react';
 import Header from './components/Header';
 import { PARKS } from './lib/parksData';
 
@@ -150,6 +150,7 @@ const SoundAnalysisPage: React.FC = () => {
         <div className="h-screen w-screen flex flex-col bg-vanguard-bg text-white overflow-hidden">
             <Header
                 onBack={() => navigate(`/park/${id}`)}
+                backLabel="← BACK"
                 parkId={id}
                 onSpeciesIntel={() => navigate(`/park/${id}/species`)}
             />
@@ -158,10 +159,6 @@ const SoundAnalysisPage: React.FC = () => {
                 {/* Page Header */}
                 <div className="px-6 pt-5 pb-4 border-b border-vanguard-border bg-vanguard-panel flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <button onClick={() => navigate(`/park/${id}`)} className="flex items-center gap-1.5 text-[10px] font-mono tracking-widest text-gray-400 hover:text-white transition-colors">
-                            <ArrowLeft className="w-3 h-3" /> BACK TO DASHBOARD
-                        </button>
-                        <div className="w-px h-4 bg-vanguard-border" />
                         <Activity className="w-5 h-5 text-vanguard-community" />
                         <h1 className="text-sm font-syne font-bold tracking-widest text-white uppercase">Sound Analysis</h1>
                     </div>

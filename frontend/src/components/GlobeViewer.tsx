@@ -119,12 +119,15 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
 
       // Drop anti-aliasing (FXAA) since modern high-DPI screens don't need it much
       viewer.scene.postProcessStages.fxaa.enabled = false;
-      viewer.resolutionScale = 0.9; // Cheap 10% boost with virtually invisible quality drop
+      viewer.resolutionScale = 0.85; // 15% cheaper with barely visible quality change on HiDPI
+
+      // Disable shadow map — single biggest GPU saving on most hardware
+      viewer.shadowMap.enabled = false;
 
       // Aggressive tile loading for "instantaneous" panning -> reduces white box flashing
       const globe = viewer.scene.globe;
-      globe.maximumScreenSpaceError = 2.5; // Slightly blockier tiles load MUCH faster initially
-      globe.tileCacheSize = 1000;
+      globe.maximumScreenSpaceError = 3; // Slightly blockier tiles load MUCH faster initially
+      globe.tileCacheSize = 1200;
       globe.preloadAncestors = true;
       globe.preloadSiblings = true;
       globe.enableLighting = false; // Disable sun lighting computations
@@ -134,6 +137,8 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
       if (viewer.scene.moon) viewer.scene.moon.show = false;
       if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false;
       if (viewer.scene.fog) viewer.scene.fog.enabled = false;
+      // Disable starfield — small JS overhead, also cleaner look on dark UI
+      if ((viewer.scene as any).skyBox) (viewer.scene as any).skyBox.show = false;
 
       viewerRef.current = viewer;
 

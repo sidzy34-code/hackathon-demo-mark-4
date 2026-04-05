@@ -16,6 +16,19 @@ export default defineConfig({
           proxy.on('proxyReq', (proxyReq) => {
             proxyReq.setHeader('Accept', 'text/event-stream');
           });
+          // Suppress "backend not ready yet" connection errors during startup
+          proxy.on('error', (err, _req, res) => {
+            const msg = err.message ?? '';
+            if (msg.includes('ECONNREFUSED') || err.constructor?.name === 'AggregateError') {
+              // Backend still starting — send a clean 503 instead of crashing the proxy
+              if (res && 'writeHead' in res && typeof (res as any).writeHead === 'function') {
+                (res as any).writeHead(503, { 'Content-Type': 'application/json' });
+                (res as any).end(JSON.stringify({ error: 'Backend starting up, please wait…' }));
+              }
+            } else {
+              console.error('[vite proxy]', err.message);
+            }
+          });
         }
       }
     }
