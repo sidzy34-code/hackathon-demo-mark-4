@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { PARKS } from '../lib/parksData';
+import { PARKS, getParkById } from '../lib/parksData';
 import { useLiveAlerts } from '../lib/liveStream';
 
 // ── Icon factory: uses inline CSS so Tailwind JIT doesn't need to scan these strings ──
@@ -106,8 +106,8 @@ const MapPanel: React.FC<MapPanelProps> = ({ parkId, estateBoundary }) => {
     }
 
     // ── Park mode: existing logic ──────────────────────────────────────────
-    const park = PARKS.find(p => p.id === parkId) || PARKS[0];
-    const { alerts, predictiveState } = useLiveAlerts(parkId || PARKS[0].id);
+    const park = getParkById(parkId) || PARKS[0];
+    const { alerts, predictiveState } = useLiveAlerts(park.id);
 
     const center = park.centerCoordinates;
     const zones = park.zones;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PARKS, AlertEvent, EventType, PriorityLevel } from './parksData';
+import { PARKS, AlertEvent, EventType, PriorityLevel, resolveParkId } from './parksData';
 import { getRandomPointInZone } from './zoneGenerator';
 
 let sharedAlerts: AlertEvent[] = [];
@@ -118,7 +118,7 @@ export function useLiveAlerts(parkId?: string | null) {
 
         if (currentParkId !== parkId) {
             currentParkId = parkId;
-            const park = PARKS.find(p => p.id === parkId);
+            const park = PARKS.find(p => p.id === resolveParkId(parkId));
             sharedAlerts = park ? [...park.mockAlerts] : [];
 
             if (eventSource) eventSource.close();

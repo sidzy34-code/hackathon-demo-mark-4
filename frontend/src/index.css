@@ -3,9 +3,17 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-vanguard-bg text-white font-sans antialiased;
   }
+}
+
+/* Radial gradient utility for hero glow */
+.bg-gradient-radial {
+  background: radial-gradient(circle, var(--tw-gradient-from) 0%, var(--tw-gradient-via) 40%, var(--tw-gradient-to) 100%);
 }
 
 /* Custom scrollbar for alert feed */

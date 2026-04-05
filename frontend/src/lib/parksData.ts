@@ -109,6 +109,28 @@ const SUN_ZONES = PARK_SHAPES.sundarbans(21.9497, 88.9468);
 const MARA_ZONES = PARK_SHAPES.maasaimara(-1.4061, 35.1019);
 const KRU_ZONES = PARK_SHAPES.kruger(-23.9884, 31.5547);
 
+// ── Supabase UUID ↔ short-ID mapping ──────────────────────────────────────────
+// Parks in Supabase use repeating-digit UUIDs for easy identification.
+export const PARK_UUID_MAP: Record<string, string> = {
+    '11111111-1111-1111-1111-111111111111': 'nagarhole',
+    '22222222-2222-2222-2222-222222222222': 'corbett',
+    '33333333-3333-3333-3333-333333333333': 'kaziranga',
+    '44444444-4444-4444-4444-444444444444': 'sundarbans',
+    '55555555-5555-5555-5555-555555555555': 'maasai-mara',
+    '66666666-6666-6666-6666-666666666666': 'kruger',
+};
+
+/** Resolve any park ID (UUID or short string) to the short string used in PARKS[] */
+export function resolveParkId(id: string | null | undefined): string {
+    if (!id) return 'nagarhole';
+    return PARK_UUID_MAP[id] ?? id;
+}
+
+/** Lookup a Park by any ID format (UUID or short). Returns undefined if not found. */
+export function getParkById(id: string | null | undefined): Park | undefined {
+    return PARKS.find(p => p.id === resolveParkId(id));
+}
+
 export const PARKS: Park[] = [
     {
         id: 'nagarhole',

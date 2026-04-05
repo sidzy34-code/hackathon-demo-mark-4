@@ -17,7 +17,7 @@ import ZoneManager from './components/ZoneManager';
 import WildlifeTrackerPanel from './components/WildlifeTrackerPanel';
 import AuthPage from './AuthPage';
 import DashboardPage from './DashboardPage';
-import LandingPage from './LandingPage';
+import MarketingPage from './MarketingPage';
 import LoadingScreen from '../LoadingScreen';
 import EstateIntelPage from './EstateIntelPage';
 import { supabase } from './lib/supabaseClient';
@@ -219,8 +219,10 @@ function App() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* Landing page — public, no auth required */}
-                <Route path="/" element={<LandingPage />} />
+                {/* Public marketing page — logged-in users skip to dashboard */}
+                <Route path="/" element={
+                    <RedirectIfAuth><MarketingPage /></RedirectIfAuth>
+                } />
 
                 {/* Auth */}
                 <Route path="/auth" element={

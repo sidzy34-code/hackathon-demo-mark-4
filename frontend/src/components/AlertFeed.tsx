@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, MapPin, Camera, Radio, ShieldAlert, Activity } from 'lucide-react';
-import { PARKS, AlertEvent } from '../lib/parksData';
+import { PARKS, AlertEvent, getParkById } from '../lib/parksData';
 import { useLiveAlerts } from '../lib/liveStream';
 import AlertDetailModal from './AlertDetailModal';
 import PredictiveAlertBadge from './PredictiveAlertBadge';
@@ -45,11 +45,11 @@ function sortAlerts(alerts: AlertEvent[]): AlertEvent[] {
 }
 
 const AlertFeed: React.FC<AlertFeedProps> = ({ parkId, isEstate, estateId }) => {
-    // For park mode: require a matching park; for estate mode: show alerts regardless
-    const park = PARKS.find(p => p.id === parkId);
+    // Resolve UUID→shortId park lookup so government park UUIDs work correctly
+    const park = getParkById(parkId);
 
-    // Always try to get a valid ID for live alerts — use first park as fallback for estates
-    const liveId = (park?.id) || PARKS[0].id;
+    // Always try to get a valid ID for live alerts — use resolved park ID, fallback to first park
+    const liveId = park?.id || PARKS[0].id;
     const { alerts } = useLiveAlerts(liveId);
     const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
     const [, forceUpdate] = useState(0);

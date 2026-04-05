@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Shield, Activity, Fingerprint, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getParkById } from '../lib/parksData';
 
 interface HeaderProps {
     onBack?: () => void;
@@ -19,7 +20,10 @@ const Header: React.FC<HeaderProps> = ({ onBack, parkId, onSpeciesIntel, backLab
         return () => clearInterval(timer);
     }, []);
 
-    const parkDisplay = parkId ? parkId.replace(/-/g, ' ').toUpperCase() : 'NAGARHOLE';
+    const resolvedPark = parkId ? getParkById(parkId) : undefined;
+    const parkDisplay = resolvedPark
+        ? resolvedPark.name
+        : (parkId ? parkId.replace(/-/g, ' ').toUpperCase() : 'NAGARHOLE NATIONAL PARK');
 
     return (
         <header className="h-16 shrink-0 z-50 relative"
@@ -53,7 +57,7 @@ const Header: React.FC<HeaderProps> = ({ onBack, parkId, onSpeciesIntel, backLab
                 {/* CENTER */}
                 <div className="flex flex-col items-center justify-center shrink-0 px-4">
                     <h2 className="text-[13px] font-syne font-bold tracking-[0.22em] text-gray-100 uppercase whitespace-nowrap">
-                        {parkDisplay} NATIONAL PARK
+                        {parkDisplay.toUpperCase()}
                     </h2>
                     <span className="text-[9px] text-vanguard-camera font-mono tracking-[0.3em] mt-0.5 opacity-75 whitespace-nowrap">
                         ◈ PROTECTED AREA

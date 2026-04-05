@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Activity, Play, Pause, AlertTriangle, Volume2, MapPin, Clock } from 'lucide-react';
+import { Activity, Play, Pause, AlertTriangle, Volume2, MapPin, Clock, Zap } from 'lucide-react';
 import Header from './components/Header';
-import { PARKS } from './lib/parksData';
+import { getParkById } from './lib/parksData';
+
+const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY_1 || import.meta.env.VITE_GROQ_API_KEY_2 || '';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 type ThreatLevel = 'THREAT' | 'WILDLIFE' | 'AMBIENT';
 
@@ -56,25 +59,39 @@ const threatLabelText: Record<ThreatLevel, string> = {
 const SoundAnalysisPage: React.FC = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const park = useMemo(() => PARKS.find(p => p.id === id), [id]);
+    const park = useMemo(() => getParkById(id), [id]);
 
     const [selectedSample, setSelectedSample] = useState<SampleClip | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [customAudioName, setCustomAudioName] = useState<string | null>(null);
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
     const [analyzing, setAnalyzing] = useState(false);
-    const [analysisSource, setAnalysisSource] = useState<'live' | 'demo'>('demo');
+    const [analysisSource, setAnalysisSource] = useState<'groq' | 'fallback'>('fallback');
     const [events, setEvents] = useState<AudioEvent[]>([]);
     const [loadingEvents, setLoadingEvents] = useState(false);
 
     useEffect(() => {
         if (!id) return;
         setLoadingEvents(true);
-        fetch(`/api/audio/${id}`)
-            .then(r => r.json())
-            .then(data => setEvents(data || []))
-            .catch(() => setEvents([]))
-            .finally(() => setLoadingEvents(false));
+        // No backend API — generate synthetic event log from PARKS data
+        setTimeout(() => {
+            const park = getParkById(id);
+            const eventTypes = ['GUNSHOT_DETECTED', 'CHAINSAW_NOISE', 'TIGER_VOCALIZATION', 'ELEPHANT_HERD', 'AMBIENT_NORMAL'];
+            const zones = park ? Object.keys(park.zones) : ['Z1', 'Z2', 'Z3'];
+            const generated = Array.from({ length: 12 }, (_, i) => ({
+                id: `evt-${i}`,
+                parkId: park?.id ?? id!,
+                zone: zones[i % zones.length],
+                timestamp: new Date(Date.now() - i * 1800_000).toLocaleTimeString(),
+                classification: eventTypes[i % eventTypes.length].replace(/_/g, ' '),
+                threatLevel: (['GUNSHOT_DETECTED', 'CHAINSAW_NOISE'].includes(eventTypes[i % eventTypes.length]) ? 'THREAT' :
+                    eventTypes[i % eventTypes.length].includes('VOCALIZATION') || eventTypes[i % eventTypes.length].includes('ELEPHANT') ? 'WILDLIFE' : 'AMBIENT') as ThreatLevel,
+                confidence: 0.65 + Math.random() * 0.3,
+                sourceType: (i % 4 === 0 ? 'COMMUNITY' : 'ACOUSTIC_SENSOR') as 'ACOUSTIC_SENSOR' | 'COMMUNITY',
+            }));
+            setEvents(generated);
+            setLoadingEvents(false);
+        }, 500);
     }, [id]);
 
     const handleSelectSample = (sample: SampleClip) => {
@@ -115,30 +132,43 @@ const SoundAnalysisPage: React.FC = () => {
         if (!canAnalyze) return;
         setAnalyzing(true);
         setAnalysisResult(null);
-        try {
-            const sampleType = selectedSample?.type || 'AMBIENT';
-            const res = await fetch('/api/analyze/audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sampleId: sampleType, sampleType, customLabel: customAudioName || undefined }),
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setAnalysisResult({ label: data.label, confidence: data.confidence, threatLevel: data.threatLevel as ThreatLevel, recommendedAction: data.recommendedAction });
-                setAnalysisSource(data.source === 'openrouter' ? 'live' : 'demo');
-            } else if (selectedSample) {
-                setAnalysisResult(deriveAnalysisForSample(selectedSample));
-                setAnalysisSource('demo');
-            }
-        } catch {
-            if (selectedSample) {
-                setAnalysisResult(deriveAnalysisForSample(selectedSample));
-                setAnalysisSource('demo');
-            }
-        } finally {
-            setAnalyzing(false);
-            setIsPlaying(false);
+        const sampleType = selectedSample?.type || 'AMBIENT';
+        const sampleName = selectedSample?.name || customAudioName || 'Unknown audio';
+        const parkName = park?.name ?? 'a national park';
+
+        // Try Groq directly from frontend (no backend needed)
+        if (GROQ_KEY) {
+            try {
+                const prompt = `You are VANGUARD, a wildlife acoustic intelligence AI deployed in ${parkName}.
+An acoustic sensor recorded: "${sampleName}" (type: ${sampleType}).
+Analyze the audio type and respond ONLY with valid JSON (no markdown):
+{"label":"precise classification","confidence":0.XX,"threatLevel":"THREAT|WILDLIFE|AMBIENT","recommendedAction":"1-2 sentence tactical recommendation"}`;
+                const res = await fetch(GROQ_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+                    body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: prompt }], max_tokens: 200, temperature: 0.3 }),
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const parsed = JSON.parse(data.choices[0].message.content.trim());
+                    setAnalysisResult({ label: parsed.label, confidence: parsed.confidence, threatLevel: parsed.threatLevel as ThreatLevel, recommendedAction: parsed.recommendedAction, source: 'groq' });
+                    setAnalysisSource('groq');
+                    setAnalyzing(false);
+                    setIsPlaying(false);
+                    return;
+                }
+            } catch { /* fall through to local */ }
         }
+
+        // Fallback: deterministic local analysis
+        if (selectedSample) {
+            setAnalysisResult(deriveAnalysisForSample(selectedSample));
+        } else {
+            setAnalysisResult({ label: 'Unknown Audio', confidence: 0.72, threatLevel: 'AMBIENT', recommendedAction: 'Unable to classify custom audio without AI. Please configure VITE_GROQ_API_KEY_1 for live analysis.' });
+        }
+        setAnalysisSource('fallback');
+        setAnalyzing(false);
+        setIsPlaying(false);
     };
 
     const canAnalyze = !!selectedSample || !!customAudioName;
@@ -235,7 +265,11 @@ const SoundAnalysisPage: React.FC = () => {
                                 className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 text-[11px] font-mono rounded border ${
                                     canAnalyze ? 'border-vanguard-community/60 bg-vanguard-community/20 text-vanguard-community hover:bg-vanguard-community/30' : 'border-vanguard-border text-gray-600 bg-black/40 cursor-not-allowed'
                                 }`}>
-                                {analyzing ? 'ANALYZING WAVEFORM…' : 'ANALYZE AUDIO'}
+                                {analyzing ? (
+                                    <><span className="inline-block w-3 h-3 rounded-full border-2 border-vanguard-community/30 border-t-vanguard-community animate-spin" />GROQ AI ANALYZING…</>
+                                ) : (
+                                    <><Zap size={13} />ANALYZE WITH AI</>
+                                )}
                             </button>
 
                             {analysisResult && (
@@ -255,8 +289,14 @@ const SoundAnalysisPage: React.FC = () => {
                                         <AlertTriangle className="w-3 h-3 mt-0.5 text-amber-400 shrink-0" />
                                         <span>{analysisResult.recommendedAction}</span>
                                     </div>
-                                    <div className="text-[9px] font-mono text-gray-500 mt-1">
-                                        {analysisSource === 'live' ? 'Recommendation generated by Open Router (live AI).' : 'Classification is deterministic for demo. Set OPENROUTER_API_KEY for AI-generated recommendations.'}
+                                    <div className="text-[9px] font-mono text-gray-500 mt-1 flex items-center gap-1.5">
+                                        {analysisSource === 'groq' ? (
+                                            <><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Powered by Groq Llama-3.1 (live AI analysis)
+                                            </>
+                                        ) : (
+                                            <><span className="w-2 h-2 rounded-full bg-gray-500 inline-block" />Deterministic fallback — set VITE_GROQ_API_KEY_1 for live AI.
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             )}

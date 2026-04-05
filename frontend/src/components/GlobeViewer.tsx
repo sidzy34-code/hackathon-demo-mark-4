@@ -16,6 +16,8 @@ import {
   ShadowMode,
 } from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
+import { resolveParkId } from '../lib/parksData';
+import type { ZonePolygon } from './ZoneManager';
 
 Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_TOKEN || '';
 
@@ -45,6 +47,7 @@ interface EstateBoundaryData {
 interface GlobeViewerProps {
   parkId: string;
   zones?: Zone[];
+  zonePolygons?: ZonePolygon[]; // actual park polygon shapes from parksData
   alerts?: any[];
   onZoneClick?: (zone: Zone) => void;
   estateBoundary?: EstateBoundaryData | null;
@@ -70,7 +73,8 @@ const MIN_PITCH = CesiumMath.toRadians(-89.9); // never quite straight down (avo
 const MAX_PITCH = CesiumMath.toRadians(-5);    // never look up above horizon
 
 export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
-  ({ parkId, zones = [], estateBoundary }, ref) => {
+  ({ parkId, zones = [], zonePolygons = [], estateBoundary }, ref) => {
+    const resolvedParkId = resolveParkId(parkId);
     const isEstate = !!estateBoundary;
     const containerRef = useRef<HTMLDivElement>(null);
     const viewerRef    = useRef<Viewer | null>(null);
@@ -251,9 +255,9 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
       });
       if (containerRef.current) resizeObserver.observe(containerRef.current);
 
-      // For estate mode: fly to the estate centroid/close-up zoom
-      // For park mode: fly to the known park coordinates
-      const initFly = () => {
+      // For estate mode: fly to estate centroid at close-up zoom
+      // For park mode: use instant setView (no animation) for maximum speed
+      const initView = () => {
         if (isEstate && estateBoundary) {
           const lat = estateBoundary.centroid_lat ?? 20;
           const lon = estateBoundary.centroid_lon ?? 78;
@@ -271,23 +275,19 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
             }
           }, 600);
         } else {
-          const c = PARK_COORDS[parkIdRef.current] || PARK_COORDS['nagarhole'];
-          setTimeout(() => {
-            if (!viewer.isDestroyed()) {
-              viewer.camera.flyTo({
-                destination: Cartesian3.fromDegrees(c.lon, c.lat, c.alt),
-                orientation: {
-                  heading: CesiumMath.toRadians(0),
-                  pitch:   CesiumMath.toRadians(-90),
-                  roll: 0,
-                },
-                duration: 2.5,
-              });
-            }
-          }, 600);
+          // PERFORMANCE: setView is instant (no animation delay)
+          const c = PARK_COORDS[resolvedParkId] || PARK_COORDS['nagarhole'];
+          viewer.camera.setView({
+            destination: Cartesian3.fromDegrees(c.lon, c.lat, c.alt),
+            orientation: {
+              heading: CesiumMath.toRadians(0),
+              pitch: CesiumMath.toRadians(-90),
+              roll: 0,
+            },
+          });
         }
       };
-      initFly();
+      initView();
 
       return () => {
         pitchClampHandler();   // remove preRender listener
@@ -318,30 +318,57 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
       }, 200);
     }, [parkId]);
 
+    // ── Re-render zones when zone data or alert status changes ────────────
     useEffect(() => {
       const viewer = viewerRef.current;
       if (!viewer || viewer.isDestroyed()) return;
 
       viewer.entities.removeAll();
 
-      zones.forEach(zone => {
-        const colors = ZONE_COLORS[zone.status] || ZONE_COLORS.normal;
-        viewer.entities.add({
-          name:     zone.name,
-          position: Cartesian3.fromDegrees(zone.longitude, zone.latitude),
-          ellipse: {
-            semiMajorAxis:    zone.radius,
-            semiMinorAxis:    zone.radius,
-            material:         Color.fromCssColorString(colors.fill),
-            outline:          true,
-            outlineColor:     Color.fromCssColorString(colors.outline),
-            outlineWidth:     2,
-            heightReference:  HeightReference.CLAMP_TO_GROUND,
-            classificationType: ClassificationType.TERRAIN,
-          },
+      // Priority: render actual polygon zones from parksData (matches the 2D map exactly)
+      if (zonePolygons && zonePolygons.length > 0) {
+        zonePolygons.forEach(zone => {
+          const colors = ZONE_COLORS[zone.status] || ZONE_COLORS.normal;
+          // parksData stores [lat, lon] but Cesium needs fromDegrees(lon, lat)
+          const positions = zone.coords.map(([lat, lon]) =>
+            Cartesian3.fromDegrees(lon, lat)
+          );
+          if (positions.length < 3) return;
+
+          viewer.entities.add({
+            name: zone.id,
+            polygon: {
+              hierarchy: new PolygonHierarchy(positions),
+              material: Color.fromCssColorString(colors.fill),
+              outline: true,
+              outlineColor: Color.fromCssColorString(colors.outline),
+              outlineWidth: 2,
+              height: 0,
+              classificationType: ClassificationType.TERRAIN,
+            },
+          });
         });
-      });
-    }, [zones]);
+      } else {
+        // Fallback: render circle ellipses for legacy Zone[] objects
+        zones.forEach(zone => {
+          const colors = ZONE_COLORS[zone.status] || ZONE_COLORS.normal;
+          viewer.entities.add({
+            name: zone.name,
+            position: Cartesian3.fromDegrees(zone.longitude, zone.latitude),
+            ellipse: {
+              semiMajorAxis: zone.radius,
+              semiMinorAxis: zone.radius,
+              material: Color.fromCssColorString(colors.fill),
+              outline: true,
+              outlineColor: Color.fromCssColorString(colors.outline),
+              outlineWidth: 2,
+              heightReference: HeightReference.CLAMP_TO_GROUND,
+              classificationType: ClassificationType.TERRAIN,
+            },
+          });
+        });
+      }
+    }, [zones, zonePolygons]);
 
     // ── Estate mode: render the estate polygon ────────────────────────────
     useEffect(() => {
@@ -402,38 +429,23 @@ export const GlobeViewer = forwardRef<GlobeRef, GlobeViewerProps>(
         return;
       }
 
-      // ── Park mode: fetch park-bounds from API ───────────────────────────
-      fetch(`/api/earthengine/park-bounds/${parkId}`)
-        .then(r => r.json())
-        .then(data => {
-          if (viewer.isDestroyed()) return null;
-          return GeoJsonDataSource.load(data, {
-            stroke:      Color.fromCssColorString('#00ffcc'),
-            fill:        Color.TRANSPARENT,
-            strokeWidth: 3,
-          });
-        })
-        .then(ds => {
-          if (ds && !viewer.isDestroyed()) {
-            viewer.dataSources.removeAll();
-            viewer.dataSources.add(ds);
-          }
-        })
-        .catch(() => {});
+      // ── Park mode: render zone polygons as ground-clamped outlines ──────
+      // Use parksData zones directly so shapes match the 2D MapPanel exactly.
+      // Do nothing here — zone polygons are handled by the zones useEffect above.
     }, [parkId, isEstate, estateBoundary]);
+
 
     const handleReset = () => {
       const viewer = viewerRef.current;
       if (!viewer || viewer.isDestroyed()) return;
-      const c = PARK_COORDS[parkId] || PARK_COORDS['nagarhole'];
-      viewer.camera.flyTo({
+      const c = PARK_COORDS[resolvedParkId] || PARK_COORDS['nagarhole'];
+      viewer.camera.setView({
         destination: Cartesian3.fromDegrees(c.lon, c.lat, c.alt),
         orientation: {
           heading: CesiumMath.toRadians(0),
-          pitch:   CesiumMath.toRadians(-90),
+          pitch: CesiumMath.toRadians(-90),
           roll: 0,
         },
-        duration: 1.8,
       });
     };
 
